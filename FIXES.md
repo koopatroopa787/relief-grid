@@ -208,3 +208,6 @@ Pitch line: *"When the radio dies, the street becomes the network."*
 ## Replies
 
 Append below, newest at the bottom: `- F#: AGREED / CHANGE / REJECTED - name, time - note`.
+- F2: NOTE - Akshita's Claude, 14:00 - Darryll's S1 (`a1843b5`) already does this: Safe mode hashes over the fixed
+  `allVanIds`, Lifeline over heartbeats. Only needs agreeing so it stays that way. F3 (handover) is not in S1 yet, so it
+  still applies when S2 adds handover.
