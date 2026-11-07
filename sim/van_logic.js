@@ -1,6 +1,6 @@
 // sim/van_logic.js
 // Owner: Darryll
-// Pure function for van decision logic: rendezvous hashing, movement, serving, gossip, and SOS.
+// Pure function for van decision logic: rendezvous hashing, movement, serving, gossip, SOS, and handover.
 // No global state, no Math.random. All deterministic.
 
 export const TIMEOUT = 60; // Ticks of silence before a van is considered timed out in Lifeline mode
@@ -40,6 +40,19 @@ export function getOwner(householdId, activeVans) {
 }
 
 /**
+ * Effective owner considering CRDT versioned overrides (F3 protocol):
+ * If an override exists for the household, the override's owner is effective.
+ * Otherwise, rendezvous hash over activeVans decides.
+ */
+export function getEffectiveOwner(householdId, activeVans, overrides = {}) {
+  const ov = overrides[householdId];
+  if (ov && ov.owner) {
+    return ov.owner;
+  }
+  return getOwner(householdId, activeVans);
+}
+
+/**
  * Initialize internal van state.
  */
 export function initVanState({ vanId = 'V0', allVanIds = ['V0'], basePos = { x: 0, y: 0 } } = {}) {
@@ -51,14 +64,14 @@ export function initVanState({ vanId = 'V0', allVanIds = ['V0'], basePos = { x: 
     vanId,
     allVanIds: [...allVanIds],
     basePos: { ...basePos },
-    served: {},               // { [householdId]: tickServed } - CRDT set of served households
+    served: {},               // { [householdId]: { t: number, by: string } | number }
+    overrides: {},            // { [householdId]: { owner: string, version: number } } - F3 CRDT overrides
     vanHeartbeats: heartbeats, // { [vanId]: lastTickSeen } - alive list
     peerInfo: {},             // { [vanId]: { pos: {x, y}, stock: number, t: number } }
-    delegatedAway: {},        // { [householdId]: recipientVanId } - handed over to peer closer
-    acceptedHandovers: {},    // { [householdId]: fromVanId } - accepted handover from peer
     carriedSos: [],           // array of { sos_id, household, lang, audio, text }
     submittedSosIds: {},      // { [sos_id]: true } - submitted to HQ
     deliveredReplies: {},     // { [sos_id]: true }
+    doubleServes: {},         // { [householdId]: { vanA, vanB, tA, tB } }
     doubleServesCount: 0,
   };
 }
@@ -66,14 +79,14 @@ export function initVanState({ vanId = 'V0', allVanIds = ['V0'], basePos = { x: 
 /**
  * Manhattan distance between two positions.
  */
-export function manhattanDist(a, b) {
+function manhattanDist(a, b) {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
 /**
  * Step 1 grid cell closer from `from` to `to`.
  */
-export function stepTowards(from, to) {
+function stepTowards(from, to) {
   if (from.x === to.x && from.y === to.y) {
     return { x: from.x, y: from.y };
   }
@@ -86,6 +99,22 @@ export function stepTowards(from, to) {
   } else {
     return { x: from.x, y: from.y + Math.sign(dy) };
   }
+}
+
+/**
+ * Extract tick number from served entry.
+ */
+function extractServedTick(entry) {
+  if (typeof entry === 'object' && entry !== null) return entry.t;
+  return Number(entry) || 0;
+}
+
+/**
+ * Extract server van ID from served entry.
+ */
+function extractServedBy(entry) {
+  if (typeof entry === 'object' && entry !== null) return entry.by;
+  return null;
 }
 
 /**
@@ -118,13 +147,13 @@ export function stepVan(state, percept) {
   const nextState = {
     ...s,
     served: { ...s.served },
+    overrides: { ...s.overrides },
     vanHeartbeats: { ...s.vanHeartbeats },
     peerInfo: { ...s.peerInfo },
-    delegatedAway: { ...s.delegatedAway },
-    acceptedHandovers: { ...s.acceptedHandovers },
     carriedSos: [...s.carriedSos],
     submittedSosIds: { ...s.submittedSosIds },
     deliveredReplies: { ...s.deliveredReplies },
+    doubleServes: { ...s.doubleServes },
   };
 
   // Self is always alive at current tick
@@ -139,13 +168,7 @@ export function stepVan(state, percept) {
     hqBatch: null,
   };
 
-  const seenHouseholds = percept.seenHouseholds || [];
-  const householdMap = new Map();
-  for (const h of seenHouseholds) {
-    householdMap.set(h.id, h);
-  }
-
-  // 1. Process Inbox: CRDT gossip merge, heartbeats, handovers, and carried SOS
+  // 1. Process Inbox: CRDT gossip merge, heartbeats, versioned overrides, and double-serve counting
   const inbox = percept.inbox || [];
   for (const envelope of inbox) {
     const sender = envelope.from;
@@ -160,9 +183,8 @@ export function stepVan(state, percept) {
       }
     }
 
-    // A. Gossip message: merge served sets and heartbeats
+    // Gossip message: merge served sets, overrides, and heartbeats
     if (msg.type === 'gossip') {
-      // Record sender's position & stock for handover decisions
       if (sender && msg.pos) {
         nextState.peerInfo[sender] = {
           pos: { ...msg.pos },
@@ -171,16 +193,48 @@ export function stepVan(state, percept) {
         };
       }
 
-      // CRDT Union merge of served households
+      // CRDT Union merge of served households + double serve detection
       if (msg.served) {
-        for (const [hId, tServed] of Object.entries(msg.served)) {
-          if (!nextState.served[hId]) {
-            nextState.served[hId] = tServed;
+        for (const [hId, remoteEntry] of Object.entries(msg.served)) {
+          const remoteTick = extractServedTick(remoteEntry);
+          const remoteBy = extractServedBy(remoteEntry);
+          const localEntry = nextState.served[hId];
+
+          if (!localEntry) {
+            nextState.served[hId] = remoteEntry;
           } else {
-            // Keep earliest served timestamp
-            if (tServed < nextState.served[hId]) {
-              nextState.served[hId] = tServed;
+            const localTick = extractServedTick(localEntry);
+            const localBy = extractServedBy(localEntry);
+
+            // Double serve detection: both served by different vans
+            if (localBy && remoteBy && localBy !== remoteBy) {
+              if (!nextState.doubleServes[hId]) {
+                nextState.doubleServes[hId] = {
+                  vanA: localBy,
+                  vanB: remoteBy,
+                  tA: localTick,
+                  tB: remoteTick,
+                };
+                nextState.doubleServesCount++;
+              }
             }
+
+            // Union merge: keep earliest served entry
+            if (remoteTick < localTick) {
+              nextState.served[hId] = remoteEntry;
+            }
+          }
+        }
+      }
+
+      // Merge CRDT versioned overrides (F3 protocol)
+      if (msg.overrides) {
+        for (const [hId, remoteOv] of Object.entries(msg.overrides)) {
+          const localOv = nextState.overrides[hId];
+          if (!localOv ||
+              remoteOv.version > localOv.version ||
+              (remoteOv.version === localOv.version && remoteOv.owner > localOv.owner)) {
+            nextState.overrides[hId] = { ...remoteOv };
           }
         }
       }
@@ -205,28 +259,6 @@ export function stepVan(state, percept) {
         }
       }
     }
-
-    // B. Handover Offer: Peer offers a household that is closer to us
-    if (msg.type === 'handover_offer' && msg.householdId) {
-      const h = householdMap.get(msg.householdId);
-      // Accept if we have stock, household is unserved, and we're not out of range
-      if (percept.stock > 0 && !nextState.served[msg.householdId] && h) {
-        nextState.acceptedHandovers[msg.householdId] = sender;
-        action.outbox.push({
-          to: sender,
-          msg: {
-            type: 'handover_ack',
-            from: nextState.vanId,
-            householdId: msg.householdId,
-          },
-        });
-      }
-    }
-
-    // C. Handover Ack: Peer confirmed acceptance of the household
-    if (msg.type === 'handover_ack' && msg.householdId) {
-      nextState.delegatedAway[msg.householdId] = sender;
-    }
   }
 
   // 2. Base operations: SOS delivery to HQ
@@ -241,8 +273,8 @@ export function stepVan(state, percept) {
   }
 
   // 3. Determine active vans for rendezvous hashing
-  // Safe mode: all known vans remain active (no double serves guaranteed).
-  // Lifeline mode: drop vans silent for > TIMEOUT ticks.
+  // Safe mode (F2): all known vans in the starting roster remain active. Never double-serve.
+  // Lifeline mode (F10): drop vans silent for > TIMEOUT ticks. Count double-serves.
   let activeVans;
   if (percept.mode === 'lifeline') {
     activeVans = nextState.allVanIds.filter(vId => {
@@ -259,6 +291,7 @@ export function stepVan(state, percept) {
   }
 
   // 4. Candidate households
+  const seenHouseholds = percept.seenHouseholds || [];
   const ownedUnserved = [];
 
   for (const h of seenHouseholds) {
@@ -267,38 +300,40 @@ export function stepVan(state, percept) {
     // Skip if world reports no aid needed
     if (h.needsAid === false) continue;
 
-    // Check ownership or accepted handover
-    const naturalOwner = getOwner(h.id, activeVans);
-    const isNaturalOwner = (naturalOwner === nextState.vanId);
-    const wasDelegatedAway = !!nextState.delegatedAway[h.id];
-    const wasAccepted = !!nextState.acceptedHandovers[h.id];
-
-    if ((isNaturalOwner && !wasDelegatedAway) || wasAccepted) {
+    // Check effective owner (considering F3 versioned overrides)
+    const owner = getEffectiveOwner(h.id, activeVans, nextState.overrides);
+    if (owner === nextState.vanId) {
       ownedUnserved.push(h);
     }
   }
 
-  // 5. Handover offers: Check if any owned household is significantly closer to a nearby peer
+  // 5. Handover negotiation (F3: Giver lets go first):
+  // If this van owns a household and a nearby peer is significantly closer with stock,
+  // this van sets overrides[h.id] = { owner: peer, version: v + 1 } locally BEFORE sending.
   if (percept.stock > 0) {
     for (const [peerId, peer] of Object.entries(nextState.peerInfo)) {
       if (peerId === nextState.vanId) continue;
-      // Peer must be recent (within last 3 ticks) and have stock
+      // Peer must be recent (heard in last 3 ticks) and have stock
       if (percept.t - peer.t <= 3 && peer.stock > 0) {
-        for (const h of ownedUnserved) {
-          if (nextState.delegatedAway[h.id]) continue;
+        for (let i = 0; i < ownedUnserved.length; i++) {
+          const h = ownedUnserved[i];
           const distToMe = manhattanDist(percept.pos, h);
           const distToPeer = manhattanDist(peer.pos, h);
-          // If peer is closer by at least 3 cells, offer handover
-          if (distToPeer + 3 < distToMe) {
-            action.outbox.push({
-              to: peerId,
-              msg: {
-                type: 'handover_offer',
-                from: nextState.vanId,
-                householdId: h.id,
-              },
-            });
-            break; // Offer at most one household per peer per tick to keep traffic small
+
+          // If peer is closer by at least 4 cells, hand it over
+          if (distToPeer + 4 < distToMe) {
+            const currentVer = nextState.overrides[h.id]?.version || 0;
+            const newVer = currentVer + 1;
+
+            // Giver lets go first: update locally immediately
+            nextState.overrides[h.id] = {
+              owner: peerId,
+              version: newVer,
+            };
+
+            // Remove from our candidate list
+            ownedUnserved.splice(i, 1);
+            break; // Hand over at most one per peer per tick
           }
         }
       }
@@ -314,7 +349,10 @@ export function stepVan(state, percept) {
   if (householdAtCurrentPos && percept.stock > 0) {
     // Serve this household!
     action.serve = householdAtCurrentPos.id;
-    nextState.served[householdAtCurrentPos.id] = percept.t;
+    nextState.served[householdAtCurrentPos.id] = {
+      t: percept.t,
+      by: nextState.vanId,
+    };
 
     // Pick up SOS if present
     if (householdAtCurrentPos.sos) {
@@ -376,6 +414,7 @@ export function stepVan(state, percept) {
       pos: percept.pos,
       stock: percept.stock,
       served: nextState.served,
+      overrides: nextState.overrides,
       heartbeats: nextState.vanHeartbeats,
       carriedSos: nextState.carriedSos,
     };
