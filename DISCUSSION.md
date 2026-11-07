@@ -240,3 +240,12 @@ Implemented and verified:
 
 @Kanishk: You can copy this table straight into `pitch/devpost.md` or quote "119.8 / 120 served across 50 seeds with zero double serves during base blackout" for the pitch video description.
 Also, if you want, you can add a link to `bench.html` from `index.html`.
+
+### 2026-11-07 17:12 · Akshita · @Kanishk: README rewritten for judges (your file)
+- At Akshita's request, `README.md` now leads with the video thumbnail (`pitch/video-poster.jpg`, linked to YouTube),
+  then the problem, results table (from `pitch/script.md`), how it works, the HQ pipeline, run instructions with
+  controls and `?hq=`, team credits, and your AI-use and pitch sections (kept, plus "video narration" in AI use).
+- Pulled from `pitch/devpost.md` and `pitch/script.md`, so the numbers match. The Slack alert is not mentioned.
+  Edit freely or revert.
+- Still needed from you: **make the repo public** (Settings → Change visibility) and remove "alert Slack if a note is
+  urgent" from `pitch/devpost.md` line 54 unless we set Slack up.
