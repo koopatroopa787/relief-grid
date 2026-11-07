@@ -11,10 +11,15 @@ export const GOSSIP_INTERVAL = 3; // Broadcast gossip every 3 ticks
  * Maps (householdId, vanId) string to an unsigned 32-bit integer.
  */
 export function hash(householdId, vanId) {
-  const str = `${householdId}:${vanId}`;
   let h = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
+  for (let i = 0; i < householdId.length; i++) {
+    h ^= householdId.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  h ^= 58; // charCode for ':'
+  h = Math.imul(h, 0x01000193);
+  for (let i = 0; i < vanId.length; i++) {
+    h ^= vanId.charCodeAt(i);
     h = Math.imul(h, 0x01000193);
   }
   return h >>> 0;
@@ -293,6 +298,7 @@ export function stepVan(state, percept) {
   // 4. Candidate households
   const seenHouseholds = percept.seenHouseholds || [];
   const ownedUnserved = [];
+  const unservedByOwner = {};
 
   for (const h of seenHouseholds) {
     // Skip if already served
@@ -302,8 +308,11 @@ export function stepVan(state, percept) {
 
     // Check effective owner (considering F3 versioned overrides)
     const owner = getEffectiveOwner(h.id, activeVans, nextState.overrides);
-    if (owner === nextState.vanId) {
-      ownedUnserved.push(h);
+    if (owner) {
+      unservedByOwner[owner] = (unservedByOwner[owner] || 0) + 1;
+      if (owner === nextState.vanId) {
+        ownedUnserved.push(h);
+      }
     }
   }
 
@@ -312,7 +321,7 @@ export function stepVan(state, percept) {
     const da = manhattanDist(percept.pos, a);
     const db = manhattanDist(percept.pos, b);
     if (da !== db) return da - db;
-    return a.id.localeCompare(b.id);
+    return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
   });
 
   // 5. Handover negotiation (F3: Giver lets go first):
@@ -325,15 +334,8 @@ export function stepVan(state, percept) {
       if (peerId === nextState.vanId) continue;
       // Peer must be recent (heard in last 3 ticks) and close (meeting <= 6 cells)
       if (percept.t - peer.t <= 3 && manhattanDist(percept.pos, peer.pos) <= 6) {
-        // Count unserved households currently owned by peer in our view
-        let peerOwnedCount = 0;
-        for (const h of seenHouseholds) {
-          if (!nextState.served[h.id] && h.needsAid !== false) {
-            if (getEffectiveOwner(h.id, activeVans, nextState.overrides) === peerId) {
-              peerOwnedCount++;
-            }
-          }
-        }
+        // Unserved households currently owned by peer in our view
+        const peerOwnedCount = unservedByOwner[peerId] || 0;
 
         // Only offload if giver has more work than peer, and peer has stock capacity
         if (ownedUnserved.length > peerOwnedCount && peer.stock > peerOwnedCount) {
@@ -353,6 +355,10 @@ export function stepVan(state, percept) {
                 owner: peerId,
                 version: currentVer + 1,
               };
+
+              // Update tallies
+              unservedByOwner[peerId] = peerOwnedCount + 1;
+              unservedByOwner[nextState.vanId]--;
 
               // Giver lets go first: remove from our candidate list
               ownedUnserved.splice(i, 1);

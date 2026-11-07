@@ -222,13 +222,31 @@ export async function createSimulation(config = {}) {
   const metrics = makeMetricsFn();
 
   const vanIds = world.vans.map(v => v.id);
+  const vanById = new Map(world.vans.map(v => [v.id, v]));
+  const seenHouseholds = world.households.map(h => ({
+    id: h.id,
+    x: h.x,
+    y: h.y,
+    needsAid: h.needsAidInitial ?? h.needsAid ?? true,
+    sos: h.sos,
+  }));
+
   const workers = [];
+  const workerResolvers = new Array(world.vans.length).fill(null);
   const syncStates = [];
 
   // Setup workers or synchronous states
   if (useWorkers && typeof Worker !== 'undefined') {
-    for (const v of world.vans) {
+    for (let i = 0; i < world.vans.length; i++) {
+      const v = world.vans[i];
       const worker = new Worker(new URL('./van_worker.js', import.meta.url), { type: 'module' });
+      worker.onmessage = (e) => {
+        if (e.data.type === 'step_done' && workerResolvers[i]) {
+          const resolve = workerResolvers[i];
+          workerResolvers[i] = null;
+          resolve({ vanId: e.data.vanId, action: e.data.action, summary: e.data.summary });
+        }
+      };
       worker.postMessage({
         type: 'init',
         vanId: v.id,
@@ -276,14 +294,6 @@ export async function createSimulation(config = {}) {
     // 2. Gather percepts for all vans
     // Households in the world need aid initially; vans only learn a house was served
     // via their own actions or gossip (percept honesty / no global state leak).
-    const seenHouseholds = world.households.map(h => ({
-      id: h.id,
-      x: h.x,
-      y: h.y,
-      needsAid: h.needsAidInitial ?? h.needsAid ?? true,
-      sos: h.sos,
-    }));
-
     const stepPromises = world.vans.map((v, i) => {
       const distToBase = Math.abs(v.x - world.base.x) + Math.abs(v.y - world.base.y);
       const nearBase = (distToBase <= 1);
@@ -303,15 +313,8 @@ export async function createSimulation(config = {}) {
 
       if (useWorkers && workers[i]) {
         return new Promise((resolve) => {
-          const w = workers[i];
-          const handler = (e) => {
-            if (e.data.type === 'step_done' && e.data.vanId === v.id) {
-              w.removeEventListener('message', handler);
-              resolve({ vanId: v.id, action: e.data.action, summary: e.data.summary });
-            }
-          };
-          w.addEventListener('message', handler);
-          w.postMessage({ type: 'step', percept });
+          workerResolvers[i] = resolve;
+          workers[i].postMessage({ type: 'step', percept });
         });
       } else {
         const res = stepVan(syncStates[i], percept);
@@ -387,7 +390,7 @@ export async function createSimulation(config = {}) {
       // Outbox routing through radio
       if (Array.isArray(action.outbox)) {
         for (const env of action.outbox) {
-          const targetVan = world.vans.find(van => van.id === env.to);
+          const targetVan = vanById.get(env.to);
           const targetPos = targetVan ? { x: targetVan.x, y: targetVan.y } : world.base;
           if (radio.canLink({ x: v.x, y: v.y }, targetPos)) {
             radio.send(v.id, env.to, env.msg);
