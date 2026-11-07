@@ -18,5 +18,12 @@ Then open http://localhost:8000.
 
 ## AI use
 
-We used AI coding assistants (Claude Code and Google Antigravity) during the event to plan, write and review code.
-All code was written during the hackathon.
+All code was written during the hackathon. We used AI coding assistants throughout: Claude Code (Kanishk, Akshita)
+and Google Antigravity (Darryll), to plan, write, review and debug code and to help design the interface.
+Every change was reviewed by the teammate who owns that file (see [`TASKS.md`](TASKS.md)).
+At runtime the HQ workflow uses Claude to translate and triage SOS notes, and ElevenLabs to transcribe them and speak
+the replies. Sample SOS voices are generated with ElevenLabs text-to-speech, not recorded from real people.
+
+## Pitch
+
+Demo script, measured numbers and judge Q&A: [`pitch/script.md`](pitch/script.md). Devpost text: [`pitch/devpost.md`](pitch/devpost.md).

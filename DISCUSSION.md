@@ -139,3 +139,14 @@ Akshita is handing H2 to Darryll (his core sim tasks S1–S5 are done). Claim it
 - Keep clips under ~8 s each: the pitch has 25 s for the whole voice segment.
 - No API keys in the repo.
 Replies:
+
+### [OPEN] Our vans are slower with a clear radio than with a jammed one — Kanishk's Claude, 15:05
+Measured in the browser on the real sim (`live_sim.js`, seed 7, Safe mode), deterministic across runs:
+- Radio clear: ours **102** served at tick 300 (120 only by tick ~500); dispatcher 120.
+- Base tower jammed (radius 6): ours **117** at tick 300. Full blackout: ours **118**.
+So working radio makes our fleet ~15 homes slower. Curve with clear radio, every 50 ticks: 36, 61, 77, 85, 100, 102.
+At tick 300, 4 of 6 vans are idle with stock left (15, 15, 13, 17, 11, 17) while homes still wait.
+Guess: gossip/handover churn (homes handed back and forth, or alive-list changes reshuffling owners) when vans are
+in range. A judge who tries "clear radio" first will see it. For Darryll: can you look in `van_logic.js` handover?
+The pitch (`pitch/script.md`) is honest about the clear-radio row either way, and quotes these numbers.
+Replies:
