@@ -181,3 +181,15 @@ Replies:
 - **Decisions open, to settle together later:** (1) which laptop runs the demo (its Tailscale IP goes into `simBase`);
   (2) who else needs an n8n login (Akshita can share it privately, or add users in n8n Settings → Users);
   (3) F1 wording and Kanishk's FIXES.md replies.
+
+### 2026-11-07 15:50 · Darryll · H2 completed: SOS clips & driver phrase bank in place
+Generated all 16 audio clips via ElevenLabs (eleven_multilingual_v2), duration 2.7s–5.0s (all under the 8s limit), placed in sim/samples/ and mirrored to hq/samples/:
+1. SOS clips:
+   - sim/samples/sos_en.mp3 (English: 'Four of us on the first floor. My father needs insulin.')
+   - sim/samples/sos_ar.mp3 (Arabic: 'نحن أربعة في الطابق الأول. والدي يحتاج إلى الأنسولين.')
+   - sim/samples/sos_ur.mp3 (Urdu: 'ہم چار لوگ ہیں، اوپر والی منزل پر۔ ابو کو انسولین چاہیے۔')
+   - sim/samples/sos_pl.mp3 (Polish: 'Jest nas czworo na piętrze. Mój tata potrzebuje insuliny.')
+2. Offline Driver Phrase Bank:
+   - sim/samples/phrases/<lang>_<key>.mp3 with keys arrived, record_sos, next_van across en, ar, ur, pl (12 files).
+3. For Kanishk (sim/world.js):
+   - You can now set audio: 'samples/sos_' + lang + '.mp3' in world.js so vans carry and transmit real audio to HQ.
