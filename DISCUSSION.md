@@ -121,3 +121,21 @@ n8n runs in Docker on Kanishk's server (Tailscale only), with the Relief Grid wo
   Which laptop runs the demo? This resolves FIXES F8 in a different way (server instead of same laptop).
 - Akshita: paste the real ElevenLabs and Anthropic keys into the two `REPLACE_ME` credentials in the n8n editor.
 Replies:
+
+### [OPEN] H2 handover to Darryll: SOS clips and driver phrase bank — Akshita's Claude, 14:58
+Akshita is handing H2 to Darryll (his core sim tasks S1–S5 are done). Claim it in `TASKS.md` (set `doing`) when you start.
+**What to make** (ElevenLabs website text-to-speech is fine, no code needed; MP3, short, one voice per language):
+1. **SOS clips**, one per language the world uses (`LANGS` in `sim/world.js`), reading that language's `SOS_TEXT`
+   as a worried household member: `sim/samples/sos_en.mp3`, `sos_ar.mp3`, `sos_ur.mp3`, `sos_pl.mp3`.
+   For Urdu, record the Urdu-script version so the voice sounds natural:
+   `ہم چار لوگ ہیں، اوپر والی منزل پر۔ ابو کو انسولین چاہیے۔`
+2. **Driver phrase bank** (what a van says offline, pre-recorded so voice works with no network), per language,
+   `sim/samples/phrases/<lang>_<key>.mp3` with keys: `arrived` ("Aid van here. One ration per household."),
+   `record_sos` ("If you need anything else, speak after the beep."), `next_van` ("Your message goes to HQ with this van.").
+**Hand-off to others:**
+- Kanishk: in `world.js`, set `audio: 'samples/sos_' + lang + '.mp3'` instead of `null` so vans carry real clips.
+  HQ (n8n on kaakserver) downloads them from `simBase` + that path, so the sim must be served on the demo laptop with
+  `python -m http.server 8000 --bind 0.0.0.0` and `simBase` set to that laptop's Tailscale IP (see the HQ entry above).
+- Keep clips under ~8 s each: the pitch has 25 s for the whole voice segment.
+- No API keys in the repo.
+Replies:

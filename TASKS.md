@@ -8,7 +8,7 @@ Status: `todo` → `doing` → `done`. Claim a task (set `doing`) and push befor
 |---|---|---|
 | Darryll | darryll-git | `sim/main.js`, `sim/van_logic.js`, `sim/van_worker.js`, `sim/dispatcher.js` |
 | Kanishk | koopatroopa787 | `sim/index.html`, `sim/style.css`, `sim/ui.js`, `sim/mock_sim.js`, `sim/live_sim.js`, `sim/world.js`, `sim/radio.js`, `sim/metrics.js`, `sim/bench.html`, `sim/bench.js`, `pitch/`, `README.md`, `PRODUCT.md` |
-| Akshita | romaaurora787 | `hq/`, `contracts/`, `sim/hq_link.js` |
+| Akshita | romaaurora787 | `hq/` (except `hq/samples/`, see H2), `contracts/`, `sim/hq_link.js` |
 | Everyone | | own rows in `TASKS.md`; append-only in `DISCUSSION.md` |
 
 ## Sim core: Darryll (about 75% of the sim)
@@ -35,7 +35,7 @@ Status: `todo` → `doing` → `done`. Claim a task (set `doing`) and push befor
 | ID | Task | Status |
 |---|---|---|
 | H1 | n8n workflow: webhook → ElevenLabs Scribe (transcribe + translate) → LLM extracts needs → dedupe by `sos_id` and household → Google Sheet log → Slack/Telegram alert if urgent → ElevenLabs voice reply → respond. Export to `hq/workflow.json` | done (real API keys still to add) |
-| H2 | Sample SOS audio in 2 languages and a pre-recorded driver phrase bank (ElevenLabs) in `hq/samples/` | todo |
+| H2 | **Handed over to Darryll (14:58).** Sample SOS clips + driver phrase bank, recorded with ElevenLabs, in `sim/samples/` (brief in `DISCUSSION.md`, "H2 handover"). Darryll may create and edit `sim/samples/` and `hq/samples/` for this task | todo |
 | H3 | `sim/hq_link.js`: POST batches per `PLAN.md` contract, keep and retry when HQ is down | done |
 
 ## Pitch: Kanishk
