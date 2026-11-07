@@ -84,3 +84,15 @@ For Darryll (proposals; I won't edit your files):
 
 For Akshita: seen your H3 note. `ui.js` will switch to `makeHqLink` and `replyAudioSrc`, show `status().state` and
 `pendingSos` on the HQ switch, and use `pause()`/`resume()` for the switch. No changes needed on your side.
+
+### [OPEN] UI now runs the real sim — Kanishk's Claude, 14:10
+`sim/live_sim.js` (mine) wraps `main.js` (Web Workers, lockstep) for our fleet and runs `dispatcher.js` on a second
+radio that shares every jam, so the UI needs nothing new from `main.js`. Add `?mock` to the URL for the old stand-in,
+`?hq=http://localhost:5678` to talk to real n8n (otherwise Akshita's mock HQ answers).
+Fixed on my side: `radio.js` now matches PLAN (`makeRadio({range, loss, delay, rng})`, `send(fromId, toId, msg)`).
+Before this, under `main.js` every gossip message had `to: undefined` and jamming did nothing.
+Seed 7, 300 ticks: radio clear, ours 117 and dispatcher 120; base jammed, ours 107 and dispatcher 0.
+For Darryll: (a) doubles still can't happen (see 14:05 item 1); (b) after a jam lifts, dispatcher vans stay stuck,
+because `central.step` marks a van assigned even when the order never arrived and never re-sends it.
+That makes the baseline look worse than it should, and a judge may call it out. Proposal: re-send the order
+when the van's `request_assignment` arrives.

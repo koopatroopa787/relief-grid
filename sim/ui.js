@@ -1,7 +1,7 @@
 // U1 · the console. Draws both boards from sim.snapshot() and drives the controls.
 // It only watches the sim: nothing here feeds state back into a van.
-// ponytail: imports the stand-in sim; switch to './main.js' once Darryll's S5 exports createSim().
-import { createSim } from './mock_sim.js';
+// Real sim by default (live_sim.js wraps Darryll's main.js + dispatcher.js). ?mock runs the single-thread stand-in.
+const { createSim } = await import(new URLSearchParams(location.search).has('mock') ? './mock_sim.js' : './live_sim.js');
 
 const $ = (id) => document.getElementById(id);
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -219,14 +219,13 @@ function drawTrend(total) {
 }
 
 // ── State and controls ──────────────────────────────────────────
-let sim, running = false, speed = 2, tool = 'jam', acc = 0, lastFrame = 0, sosKey = '';
+let sim, running = false, busy = false, speed = 2, tool = 'jam', acc = 0, lastFrame = 0, sosKey = '';
 const boards = [makeBoard($('mapOurs'), 'ours'), makeBoard($('mapDisp'), 'dispatcher')];
 
-function newSim() {
-  sim = createSim({ seed: SEED, mode: currentMode(), loss: +$('loss').value / 100 });
+async function newSim() {
+  sim?.terminate?.();
+  sim = await createSim({ seed: SEED, mode: currentMode(), loss: +$('loss').value / 100 });
   sim.setHqOnline($('hqSwitch').getAttribute('aria-checked') === 'true');
-  // Akshita's hq_link.js (H3) posts batches to n8n when it exists.
-  import('./hq_link.js').then((m) => m.sendBatch && sim.onBatch(m.sendBatch)).catch(() => {});
   sosKey = '';
   history.length = 0;
   $('btnBlackout').setAttribute('aria-pressed', 'false');
@@ -260,7 +259,8 @@ function setMode(m) {
 
 const SOS_STATE = { waiting: 'Waiting', carried: 'With', at_hq: 'At HQ', replied: 'Replied' };
 function renderSos(snap) {
-  const key = snap.sos.map((s) => s.state + s.van).join() + snap.hqOnline;
+  const hq = sim.hqStatus?.();
+  const key = snap.sos.map((s) => s.state + s.van).join() + snap.hqOnline + (hq ? hq.state + hq.pendingSos : '');
   if (key === sosKey) return;
   sosKey = key;
   const list = $('sosList');
@@ -268,8 +268,8 @@ function renderSos(snap) {
   list.innerHTML = '';
   for (const s of snap.sos) {
     const li = document.createElement('li');
-    const audio = s.reply?.audio_b64 ? `data:${s.reply.mime || 'audio/mpeg'};base64,${s.reply.audio_b64}` : s.audio;
-    const label = s.state === 'carried' ? `With ${s.van}` : s.state === 'at_hq' && !snap.hqOnline ? 'HQ offline' : SOS_STATE[s.state];
+    const audio = s.reply?.audio_b64 ? `data:${s.reply.mime || 'audio/mpeg'};base64,${s.reply.audio_b64}` : s.reply?.audio_url || s.audio;
+    const label = s.state === 'carried' ? `With ${s.van}` : s.state === 'at_hq' && (!snap.hqOnline || hq?.state === 'down') ? 'Queued' : SOS_STATE[s.state];
     li.innerHTML = `
       <button class="btn play" ${audio ? '' : 'disabled'} title="${audio ? 'Play voice note' : 'Voice arrives from HQ'}" aria-label="Play voice note from ${s.household}"><svg><use href="#i-voice"/></svg></button>
       <span><span class="who">${s.household} · ${s.lang.toUpperCase()}</span><br><span class="line" lang="${s.lang}" dir="auto"></span></span>
@@ -307,16 +307,24 @@ function render() {
 function frame(now) {
   const dt = Math.min(0.25, (now - lastFrame) / 1000 || 0);
   lastFrame = now;
-  if (running) {
-    acc += dt * BASE_TPS * speed;
-    while (acc >= 1) {
-      sim.tick(); acc -= 1;
-      const s = sim.snapshot();
-      history.push({ o: s.ours.served, d: s.dispatcher.served, x: s.ours.doubles });
-    }
-    render();
+  if (running && sim) {
+    acc = Math.min(acc + dt * BASE_TPS * speed, 4);
+    if (!busy && acc >= 1) runTicks(Math.floor(acc));
   }
   requestAnimationFrame(frame);
+}
+
+// Ticks are async (one Web Worker per van, lockstep), so run them one after another, never overlapping.
+async function runTicks(k) {
+  busy = true;
+  const s0 = sim;
+  for (let i = 0; i < k && s0 === sim; i++) {
+    await sim.tick(); acc -= 1;
+    const s = sim.snapshot();
+    history.push({ o: s.ours.served, d: s.dispatcher.served, x: s.ours.doubles });
+  }
+  busy = false;
+  if (s0 === sim) render();
 }
 
 // Brush: drag on either map. Both maps share the same airwaves.
@@ -335,7 +343,7 @@ boards.forEach((b, i) => {
 });
 
 $('btnPlay').addEventListener('click', () => setRunning(!running));
-$('btnReset').addEventListener('click', () => { setRunning(false); newSim(); });
+$('btnReset').addEventListener('click', () => { setRunning(false); acc = 0; newSim(); });
 $('toolJam').addEventListener('click', () => setTool('jam'));
 $('toolErase').addEventListener('click', () => setTool('erase'));
 $('modeSafe').addEventListener('click', () => setMode('safe'));
@@ -369,6 +377,6 @@ document.addEventListener('keydown', (e) => {
 new ResizeObserver(() => { boards.forEach((b) => b.invalidate()); sim && render(); }).observe($('mapOurs'));
 
 readColors();
+await newSim();
 document.fonts.ready.then(() => render());
-newSim();
 requestAnimationFrame(frame);

@@ -1,6 +1,7 @@
 // D2 · the only way anything talks. Range, packet loss, delay and a jamming mask.
 
-export function makeRadio({ w, h, range = 8, loss = 0, delay = 0, rng }) {
+// PLAN.md contract: makeRadio({range, loss, delay, rng}). w/h default to the PLAN world size.
+export function makeRadio({ w = 48, h = 32, range = 8, loss = 0, delay = 0, rng }) {
   const jammed = new Uint8Array(w * h);
   let queue = [], now = 0, blackout = false;
 
@@ -38,10 +39,12 @@ export function makeRadio({ w, h, range = 8, loss = 0, delay = 0, rng }) {
     setLoss(p) { loss = Math.min(1, Math.max(0, p)); },
     get loss() { return loss; },
     canLink,
-    // from/to are {id, x, y}. Dropped silently on a failed link or by packet loss.
+    // from/to are van ids (PLAN.md; the caller checks canLink first) or {id, x, y} to check the link here.
+    // Dropped silently on a failed link or by packet loss.
     send(from, to, msg, r) {
-      if (!canLink(from, to, r) || rng() < loss) return false;
-      queue.push({ at: now + delay, to: to.id, from: from.id, msg });
+      const placed = typeof from === 'object' && typeof to === 'object';
+      if ((placed && !canLink(from, to, r)) || rng() < loss) return false;
+      queue.push({ at: now + delay, to: to.id ?? to, from: from.id ?? from, msg });
       return true;
     },
     deliver(t) {

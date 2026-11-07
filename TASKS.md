@@ -7,7 +7,7 @@ Status: `todo` → `doing` → `done`. Claim a task (set `doing`) and push befor
 | Owner | GitHub | Files |
 |---|---|---|
 | Darryll | darryll-git | `sim/main.js`, `sim/van_logic.js`, `sim/van_worker.js`, `sim/dispatcher.js` |
-| Kanishk | koopatroopa787 | `sim/index.html`, `sim/style.css`, `sim/ui.js`, `sim/mock_sim.js`, `sim/world.js`, `sim/radio.js`, `sim/metrics.js`, `sim/bench.html`, `sim/bench.js`, `pitch/`, `README.md`, `PRODUCT.md` |
+| Kanishk | koopatroopa787 | `sim/index.html`, `sim/style.css`, `sim/ui.js`, `sim/mock_sim.js`, `sim/live_sim.js`, `sim/world.js`, `sim/radio.js`, `sim/metrics.js`, `sim/bench.html`, `sim/bench.js`, `pitch/`, `README.md`, `PRODUCT.md` |
 | Akshita | romaaurora787 | `hq/`, `contracts/`, `sim/hq_link.js` |
 | Everyone | | own rows in `TASKS.md`; append-only in `DISCUSSION.md` |
 
