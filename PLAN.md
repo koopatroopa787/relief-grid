@@ -39,7 +39,7 @@ During a split we choose availability with a guarantee (Safe mode), or more avai
 All positions are grid cells; time is integer ticks. All randomness comes from `world.rng` (seeded), never `Math.random`.
 
 ```js
-// sim/world.js  (owner: Daryl)
+// sim/world.js  (owner: Kanishk)
 makeWorld(seed, {w: 48, h: 32, households: 120, vans: 6}) -> {
   seed, w, h, rng,                       // rng() -> float in [0,1), deterministic
   base: {x, y},
@@ -47,7 +47,7 @@ makeWorld(seed, {w: 48, h: 32, households: 120, vans: 6}) -> {
   vans: [{id, x, y, stock}]
 }
 
-// sim/radio.js  (owner: Daryl)
+// sim/radio.js  (owner: Kanishk)
 makeRadio({range: 8, loss: 0.0, delay: 0, rng}) -> {
   jam(x, y, r), clearJam(),              // jamming brush; jammed cells block any link touching them
   setLoss(p),                            // 0..1 packet loss slider
@@ -56,12 +56,12 @@ makeRadio({range: 8, loss: 0.0, delay: 0, rng}) -> {
   deliver(t) -> [{to, from, msg}]        // messages arriving at tick t
 }
 
-// sim/van_logic.js  (owner: Kanishk) pure function, used by the worker and by the bench
+// sim/van_logic.js  (owner: Darryll) pure function, used by the worker and by the bench
 stepVan(state, percept) -> {state, action}
   percept = {t, pos, stock, seenHouseholds: [{id, x, y, needsAid, sos}], inbox: [msg], nearBase: bool, mode: 'safe'|'lifeline'}
   action  = {moveTo: {x, y} | null, serve: householdId | null, outbox: [{to, msg}], pickupSos: [sos_id], hqBatch: [sos] | null}
 
-// sim/metrics.js  (owner: Daryl)
+// sim/metrics.js  (owner: Kanishk)
 makeMetrics() -> { update(t, world, events), summary() -> {served, doubleServes, missed, stockWasted, timeToAgree} }
 ```
 
@@ -86,7 +86,7 @@ and nobody gets served twice. Judge, jam it."
 
 ## Schedule
 
-| Time | Sim (Kanishk 75%, Daryl 25%) | HQ (Akshita) | Pitch (Kanishk) |
+| Time | Sim (Darryll 75%, Kanishk 25%) | HQ (Akshita) | Pitch (Kanishk) |
 |---|---|---|---|
 | 13:15–14:30 | world, radio, van_logic ownership + Safe mode, canvas render | n8n up, webhook, ElevenLabs transcription | |
 | 14:30–15:30 | gossip, handover, jam brush, dispatcher baseline, metrics | LLM extract, dedupe, Sheet, alert, voice reply | |

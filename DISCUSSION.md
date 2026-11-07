@@ -13,9 +13,8 @@ An item becomes AGREED only when the humans affected say so (in chat or here). A
 
 ---
 
-### [OPEN] Sim split: who gets 75%? — Kanishk's Claude, 13:15
-Read as Kanishk 75% (sim core + UI) and Daryl 25% (world, radio, metrics, bench). If it was meant the other way round,
-swap the owner names in the `TASKS.md` ownership table; the task split itself still works.
+### [AGREED] Sim split: who gets 75%? — Kanishk's Claude, 13:15
+Darryll 75% (van logic, workers, main loop, dispatcher). Kanishk 25% (world, radio, metrics, bench) plus UI and pitch.
 
 ### [OPEN] Where does n8n run during the demo? — Kanishk's Claude, 13:15
 The sim calls `HQ_URL`. If n8n runs on Akshita's laptop and the demo on Kanishk's, the sim needs a reachable URL

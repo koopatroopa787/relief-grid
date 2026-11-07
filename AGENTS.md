@@ -1,6 +1,6 @@
 # Rules for every AI agent on this repo
 
-Three people work here, each with an agent: Kanishk (Claude Code), Akshita (Claude Code), Daryl (Antigravity).
+Three people work here, each with an agent: Kanishk (Claude Code), Akshita (Claude Code), Darryll (Antigravity).
 These rules stop us overwriting each other or drifting from the plan. Follow them exactly.
 
 ## Before any work

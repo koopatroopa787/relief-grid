@@ -4,14 +4,14 @@ Status: `todo` → `doing` → `done`. Claim a task (set `doing`) and push befor
 
 ## Ownership (who may edit what)
 
-| Owner | Files |
-|---|---|
-| Kanishk | `sim/index.html`, `sim/style.css`, `sim/ui.js`, `sim/main.js`, `sim/van_logic.js`, `sim/van_worker.js`, `sim/dispatcher.js`, `pitch/`, `README.md` |
-| Daryl | `sim/world.js`, `sim/radio.js`, `sim/metrics.js`, `sim/bench.html`, `sim/bench.js` |
-| Akshita | `hq/`, `contracts/`, `sim/hq_link.js` |
-| Everyone | own rows in `TASKS.md`; append-only in `DISCUSSION.md` |
+| Owner | GitHub | Files |
+|---|---|---|
+| Darryll | darryll-git | `sim/main.js`, `sim/van_logic.js`, `sim/van_worker.js`, `sim/dispatcher.js` |
+| Kanishk | koopatroopa787 | `sim/index.html`, `sim/style.css`, `sim/ui.js`, `sim/world.js`, `sim/radio.js`, `sim/metrics.js`, `sim/bench.html`, `sim/bench.js`, `pitch/`, `README.md` |
+| Akshita | romaaurora787 | `hq/`, `contracts/`, `sim/hq_link.js` |
+| Everyone | | own rows in `TASKS.md`; append-only in `DISCUSSION.md` |
 
-## Sim core: Kanishk (about 75% of the sim)
+## Sim core: Darryll (about 75% of the sim)
 
 | ID | Task | Status |
 |---|---|---|
@@ -20,15 +20,15 @@ Status: `todo` → `doing` → `done`. Claim a task (set `doing`) and push befor
 | S3 | `van_logic.js`: Lifeline mode (timeout drops silent vans), count double serves | todo |
 | S4 | `dispatcher.js`: central dispatcher baseline over the same radio | todo |
 | S5 | `main.js` + `van_worker.js`: tick loop, one Web Worker per van, route messages through `radio` | todo |
-| U1 | `index.html`, `ui.js`, `style.css`: canvas map, jam brush, loss slider, Safe/Lifeline toggle, side-by-side dispatcher view, metrics panel, play SOS and reply audio | todo |
 
-## Sim support: Daryl (about 25% of the sim)
+## Sim support and UI: Kanishk (about 25% of the sim, plus the UI)
 
 | ID | Task | Status |
 |---|---|---|
 | D1 | `world.js`: seeded RNG, flood map, base, households (people, language, some with SOS), vans | todo |
 | D2 | `radio.js`: range, packet loss, delay, jamming mask, `send`/`deliver` | todo |
 | D3 | `metrics.js`, `bench.js`, `bench.html`: metrics, then run 50 seeds headless (ours vs dispatcher vs loss level), output a chart | todo |
+| U1 | `index.html`, `ui.js`, `style.css`: canvas map, jam brush, loss slider, Safe/Lifeline toggle, side-by-side dispatcher view, metrics panel, play SOS and reply audio | todo |
 
 ## HQ: Akshita
 
