@@ -249,3 +249,13 @@ Also, if you want, you can add a link to `bench.html` from `index.html`.
   Edit freely or revert.
 - Still needed from you: **make the repo public** (Settings → Change visibility) and remove "alert Slack if a note is
   urgent" from `pitch/devpost.md` line 54 unless we set Slack up.
+
+### 2026-11-07 17:23 · Kanishk · @Darryll: poker bot (submitted)
+The MUDS poker bot is submitted (Google Form, team `relief-grid`, all three of us listed). Code:
+https://github.com/koopatroopa787/poker_bot (public fork of Manchester-AI-Society/poker_bot).
+- Our files: `model.py` (engine adapter), `brain.py` (opponent range from their betting, Monte Carlo equity, best EV
+  of fold / call / raise sizes), `fasteval.py` (fast hand evaluator), `preflop_table.py`, `relief-grid.pkl`.
+- Run: `git clone` it, `python -m venv .venv`, `.venv\Scripts\pip install -r requirements-dev.txt`,
+  then `.venv\Scripts\python -m evals --deals 1000` and `.venv\Scripts\python -m pytest tests/test_model.py -q`.
+- Scores at 1000 deals (bb/100): fold +75, call +474, random +398, shove +135, tight +44, equity +216; no faults.
+- If you change it: re-pack with `.venv\Scripts\python -m submit --team relief-grid`, push, and resubmit the form.
