@@ -102,19 +102,25 @@ when the radio isn't working.
 - Three people and three AI coding agents in one repo for six hours. We split file ownership up front, and any change
   to someone else's file went through a written proposal first. Nobody overwrote anybody, which honestly surprised us.
 
+## Accomplishments that we're proud of
+
+- A guarantee you can actually watch. Jam the whole city and "served twice" stays at zero, and it held in all 200
+  Safe-mode runs of our benchmark.
+- You don't need us there to see it work. Judges can break the radio themselves, live, with no script.
+- Voice SOS works end to end, in the family's own language, and HQ is allowed to fail without the field noticing.
+- Six hours, three people, three AI agents, one repo, and not a single overwritten file.
+
 ## What we learned
 
 Rendezvous hashing turned out to be a great fit for coordinating without a network: you get agreement for free,
 without sending a single message. And admitting where the dispatcher wins made our case stronger, not weaker.
 
-## What's next
+## What's next for Relief Grid
 
 Real road routing for the vans, a driver app that plays pre-recorded phrases offline, and testing the ownership rule
 on real delivery data from a relief organisation.
 
-## AI use
-
-Everything was written during the hackathon. We used AI coding assistants the whole way through: Claude Code
+**A note on AI use:** everything was written during the hackathon. We used AI coding assistants the whole way through: Claude Code
 (Kanishk and Akshita) and Google Antigravity (Darryll), to plan, write, review and debug code and to help design the
 interface. Every change was reviewed by the teammate who owns that file. At runtime, HQ uses Claude to translate and
 triage SOS notes, and ElevenLabs to transcribe them and speak the replies. The sample SOS voices and the video
