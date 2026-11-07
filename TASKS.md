@@ -18,7 +18,7 @@ Status: `todo` → `doing` → `done`. Claim a task (set `doing`) and push befor
 | S1 | `van_logic.js`: rendezvous-hash ownership, move to nearest owned household, serve, Safe mode | done |
 | S2 | `van_logic.js`: gossip `served` set (union merge) and alive-list, handover when two vans meet | done |
 | S3 | `van_logic.js`: Lifeline mode (timeout drops silent vans), count double serves | done |
-| S4 | `dispatcher.js`: central dispatcher baseline over the same radio | todo |
+| S4 | `dispatcher.js`: central dispatcher baseline over the same radio | doing |
 | S5 | `main.js` + `van_worker.js`: tick loop, one Web Worker per van, route messages through `radio` | todo |
 
 ## Sim support and UI: Kanishk (about 25% of the sim, plus the UI)
