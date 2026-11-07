@@ -1,4 +1,5 @@
 {
+  "_about": "POST {HQ_URL}/webhook/sos. HQ_URL today: http://100.85.160.126:5678 (n8n on kaakserver, Tailscale only). See hq/README.md.",
   "request": {
     "van": "V2",
     "t": 412,
@@ -7,20 +8,40 @@
         "sos_id": "S-H17-001",
         "household": "H17",
         "lang": "ar",
-        "audio": "samples/sos_h17_ar.mp3",
-        "text": null
+        "audio": "samples/sos_ar.mp3",
+        "text": "نحن أربعة في الطابق الأول. والدي يحتاج إلى الأنسولين."
       }
     ]
   },
-  "response": {
+  "_request_notes": [
+    "audio: a path relative to simBase (set in the n8n 'Check cache' node) or an absolute URL. null = text only.",
+    "text: used if there is no audio or transcription fails."
+  ],
+  "response_200": {
     "replies": [
       {
         "sos_id": "S-H17-001",
         "household": "H17",
         "lang": "ar",
-        "text": "Insulin is coming with van 3 within two hours.",
-        "audio_url": "samples/reply_h17_ar.mp3"
+        "text": "وصلت رسالتك إلى المقر. سيتم إرسال الأنسولين مع الشاحنة التالية.",
+        "audio_b64": "<base64 MP3 of the spoken reply, or null if text-to-speech failed>",
+        "mime": "audio/mpeg",
+        "english": "There are four of us on the first floor. My father needs insulin.",
+        "needs": ["insulin"],
+        "urgency": 3,
+        "degraded": false
       }
     ]
-  }
+  },
+  "_response_notes": [
+    "degraded: true means Claude was unavailable and a fixed reply in the household's language was used.",
+    "A resent sos_id is answered from HQ's cache without calling any API (only complete, non-degraded replies are cached).",
+    "Play audio with new Audio(replyAudioSrc(reply)).play() from sim/hq_link.js."
+  ],
+  "response_503": {
+    "error": "Some SOS notes could not be transcribed; resend the batch later.",
+    "failed": [{ "sos_id": "S-H50-001", "why": "<reason>" }],
+    "replies": ["<replies for the SOS notes that did work>"]
+  },
+  "_503_notes": "hq_link.js treats 503 as HQ down: it keeps the whole batch and retries with backoff; finished ones come back from the cache."
 }
