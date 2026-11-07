@@ -243,7 +243,7 @@ input[type="range"]::-moz-range-thumb { width: 10px; height: 18px; background: v
   html, body { height: auto; }
   .sheet { height: auto; }
   .mast { grid-template-columns: minmax(0, 1fr); }
-  .brief { border-left: 0; border-top: 1px solid var(--rule); }
+  .brief { border-left: 0; border-top: 1px solid var(--rule); max-width: none; }
   .meta > div { min-width: 0; }
   .meta dd { white-space: normal; }
   .plate { grid-template-columns: minmax(0, 1fr); }
