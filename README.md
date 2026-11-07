@@ -6,7 +6,7 @@ Neptune North challenge, with ElevenLabs and n8n powering HQ.
 
 [![Watch the 2-minute demo](pitch/video-poster.jpg)](https://youtu.be/gYtxgIP4elE)
 
-**Video (2:07):** https://youtu.be/gYtxgIP4elE · **Devpost text:** [`pitch/devpost.md`](pitch/devpost.md)
+**Try it live:** https://kaakserver.tail042e87.ts.net:10000/ · **Video (2:07):** https://youtu.be/gYtxgIP4elE · **Devpost text:** [`pitch/devpost.md`](pitch/devpost.md)
 
 ## The problem
 
