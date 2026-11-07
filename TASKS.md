@@ -28,7 +28,7 @@ Status: `todo` → `doing` → `done`. Claim a task (set `doing`) and push befor
 | D1 | `world.js`: seeded RNG, flood map, base, households (people, language, some with SOS), vans | done |
 | D2 | `radio.js`: range, packet loss, delay, jamming mask, `send`/`deliver` | done |
 | D3 | `metrics.js`, `bench.js`, `bench.html`: metrics, then run 50 seeds headless (ours vs dispatcher vs loss level), output a chart | todo |
-| U1 | `index.html`, `ui.js`, `style.css`: canvas map, jam brush, loss slider, Safe/Lifeline toggle, side-by-side dispatcher view, metrics panel, play SOS and reply audio | doing |
+| U1 | `index.html`, `ui.js`, `style.css`: canvas map, jam brush, loss slider, Safe/Lifeline toggle, side-by-side dispatcher view, metrics panel, play SOS and reply audio | done |
 
 ## HQ: Akshita
 
