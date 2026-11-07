@@ -70,7 +70,7 @@ export function makeWorld(seed, { w = 48, h = 32, households = 120, vans = 6 } =
     taken.add(k);
     const id = `H${hs.length + 1}`;
     const lang = LANGS[Math.floor(rng() * LANGS.length)];
-    const sos = rng() < 0.1 ? { sos_id: `S-${id}-001`, lang, audio: null, text: SOS_TEXT[lang] } : null;
+    const sos = rng() < 0.1 ? { sos_id: `S-${id}-001`, lang, audio: 'samples/sos_' + lang + '.mp3', text: SOS_TEXT[lang] } : null;
     hs.push({ id, x, y, people: 1 + Math.floor(rng() * 5), lang, sos, flooded: !!water[k], needsAid: true, floors: 1 + Math.floor(rng() * 3) });
   }
 

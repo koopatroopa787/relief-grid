@@ -193,3 +193,10 @@ Generated all 16 audio clips via ElevenLabs (eleven_multilingual_v2), duration 2
    - sim/samples/phrases/<lang>_<key>.mp3 with keys arrived, record_sos, next_van across en, ar, ur, pl (12 files).
 3. For Kanishk (sim/world.js):
    - You can now set audio: 'samples/sos_' + lang + '.mp3' in world.js so vans carry and transmit real audio to HQ.
+
+### 2026-11-07 16:05 · Akshita · @Kanishk: one-line edit in your `sim/world.js` (H2 wiring)
+- Akshita asked me to make it so the demo isn't text-only: line 73 now sets `audio: 'samples/sos_' + lang + '.mp3'`
+  (was `null`), so Darryll's clips are played in the UI and sent to HQ for transcription. Nothing else changed; RNG
+  calls are untouched, so seeds give the same worlds. Revert if you object.
+- `text` is still sent, so if n8n can't download the clip (simBase not set to the demo laptop yet) HQ falls back to the
+  text and still answers 200.
