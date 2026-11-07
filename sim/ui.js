@@ -368,9 +368,16 @@ function drawTrend(total) {
 let sim, running = false, busy = false, speed = 2, tool = 'jam', acc = 0, lastFrame = 0, sosKey = '';
 const boards = [makeBoard($('mapOurs'), 'ours'), makeBoard($('mapDisp'), 'dispatcher')];
 
+let simGen = 0;
 async function newSim() {
-  sim?.terminate?.();
-  sim = await createSim({ seed: SEED, mode: currentMode(), loss: +$('loss').value / 100 });
+  const gen = ++simGen;
+  const next = await createSim({ seed: SEED, mode: currentMode(), loss: +$('loss').value / 100 });
+  if (gen !== simGen) { next.terminate?.(); return; } // a newer reset already won
+  const old = sim;
+  sim = next;
+  old?.terminate?.();
+  // A tick of the old sim may never finish once its workers are gone; don't let it block the new one.
+  busy = false; acc = 0;
   sim.setHqOnline($('hqSwitch').getAttribute('aria-checked') === 'true');
   sosKey = '';
   history.length = 0;
@@ -470,12 +477,17 @@ function frame(now) {
 async function runTicks(k) {
   busy = true;
   const s0 = sim;
-  for (let i = 0; i < k && s0 === sim; i++) {
-    await sim.tick(); acc -= 1;
-    const s = sim.snapshot();
-    history.push({ o: s.ours.served, d: s.dispatcher.served, x: s.ours.doubles });
+  try {
+    for (let i = 0; i < k && s0 === sim; i++) {
+      await s0.tick(); acc -= 1;
+      const s = s0.snapshot();
+      history.push({ o: s.ours.served, d: s.dispatcher.served, x: s.ours.doubles });
+    }
+  } catch (err) {
+    console.error('tick failed', err); // never leave the loop stuck on busy
+  } finally {
+    if (s0 === sim) busy = false;
   }
-  busy = false;
   if (s0 === sim) render();
 }
 
