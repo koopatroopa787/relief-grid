@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relief Grid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-play" viewBox="0 0 20 20"><path d="M6 4.5v11l9-5.5z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 20 20"><path d="M6 4.5v11M14 4.5v11"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 20 20"><path d="M4.5 10a5.5 5.5 0 1 0 1.6-3.9M4.5 3.5v3.2h3.2"/></symbol>
+  <symbol id="i-jam" viewBox="0 0 20 20"><path d="M10 3v14M5.5 6.5a6 6 0 0 0 0 7M14.5 6.5a6 6 0 0 1 0 7M3 3l14 14"/></symbol>
+  <symbol id="i-erase" viewBox="0 0 20 20"><path d="M8 16h8M4.5 12.5 11 6l4 4-5.5 5.5H7z"/></symbol>
+  <symbol id="i-blackout" viewBox="0 0 20 20"><path d="M10 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12zM5.8 5.8l8.4 8.4"/></symbol>
+  <symbol id="i-voice" viewBox="0 0 20 20"><path d="M4 8v4h3l4 3V5L7 8zM14 7.5a3.5 3.5 0 0 1 0 5"/></symbol>
+</svg>
+
+<header class="bar">
+  <div class="brand">
+    <h1>Relief Grid</h1>
+    <p class="plate">Lower Irwell flood · night of 7 Nov · <span id="seedLabel">seed 7</span></p>
+  </div>
+  <div class="clock" aria-live="off">
+    <span class="clock-label">Tick</span>
+    <span class="flap" id="flapT" data-digits="4"></span>
+  </div>
+  <div class="radio-state" id="radioState" data-state="ok">
+    <span class="dot" aria-hidden="true"></span><span id="radioText">Radio clear</span>
+  </div>
+</header>
+
+<main class="room">
+  <section class="boards" aria-label="Side-by-side comparison">
+    <figure class="board" data-side="ours">
+      <figcaption>
+        <h2>Relief Grid <span class="sub">no dispatcher</span></h2>
+        <span class="chip" id="oursMode">Safe mode</span>
+      </figcaption>
+      <div class="stage"><canvas id="mapOurs" aria-label="Map: our vans, each deciding alone"></canvas></div>
+      <dl class="readout">
+        <div><dt>Served</dt><dd><span class="flap" id="oServed" data-digits="3"></span><span class="of">/120</span></dd></div>
+        <div class="dbl"><dt>Served twice</dt><dd><span class="flap" id="oDouble" data-digits="3"></span></dd></div>
+        <div><dt>Vans stalled</dt><dd><span class="flap" id="oIdle" data-digits="1"></span><span class="of">/6</span></dd></div>
+      </dl>
+    </figure>
+
+    <figure class="board" data-side="dispatcher">
+      <figcaption>
+        <h2>Central dispatcher <span class="sub">baseline</span></h2>
+        <span class="chip quiet" id="dispState">Tower linked</span>
+      </figcaption>
+      <div class="stage"><canvas id="mapDisp" aria-label="Map: dispatcher vans, waiting for orders from the base tower"></canvas></div>
+      <dl class="readout">
+        <div><dt>Served</dt><dd><span class="flap" id="dServed" data-digits="3"></span><span class="of">/120</span></dd></div>
+        <div class="dbl"><dt>Served twice</dt><dd><span class="flap" id="dDouble" data-digits="3"></span></dd></div>
+        <div><dt>Vans stalled</dt><dd><span class="flap" id="dIdle" data-digits="1"></span><span class="of">/6</span></dd></div>
+      </dl>
+    </figure>
+
+    <figure class="trend">
+      <figcaption>
+        <h2>Households served over time</h2>
+        <span class="trend-key"><i class="k van"></i>Relief Grid <i class="k disp"></i>Dispatcher <i class="k twice"></i>Served twice</span>
+      </figcaption>
+      <div class="trend-stage"><canvas id="trend" aria-label="Line chart of households served over time, both systems"></canvas></div>
+    </figure>
+  </section>
+
+  <aside class="rail" aria-label="Controls">
+    <section class="group">
+      <h3>Run</h3>
+      <div class="row">
+        <button class="btn primary" id="btnPlay" aria-pressed="false"><svg><use href="#i-play"/></svg><span>Run</span></button>
+        <button class="btn" id="btnReset"><svg><use href="#i-reset"/></svg><span>Reset</span></button>
+      </div>
+      <label class="field" for="speed">Speed <output id="speedOut">2×</output></label>
+      <input type="range" id="speed" min="1" max="4" step="1" value="2">
+    </section>
+
+    <section class="group">
+      <h3>Break the radio</h3>
+      <div class="row tools" role="radiogroup" aria-label="Brush">
+        <button class="btn tool" id="toolJam" role="radio" aria-checked="true"><svg><use href="#i-jam"/></svg><span>Jam</span></button>
+        <button class="btn tool" id="toolErase" role="radio" aria-checked="false"><svg><use href="#i-erase"/></svg><span>Unjam</span></button>
+      </div>
+      <p class="hint">Drag across either map. Both maps share the same airwaves.</p>
+      <button class="btn danger wide" id="btnBlackout" aria-pressed="false"><svg><use href="#i-blackout"/></svg><span>Total blackout</span></button>
+      <label class="field" for="loss">Packet loss <output id="lossOut">0%</output></label>
+      <input type="range" id="loss" min="0" max="100" step="5" value="0">
+    </section>
+
+    <section class="group">
+      <h3>When a van goes silent</h3>
+      <div class="seg" role="radiogroup" aria-label="Mode">
+        <button role="radio" aria-checked="true" id="modeSafe">Safe<small>never serve twice</small></button>
+        <button role="radio" aria-checked="false" id="modeLife">Lifeline<small>cover its homes</small></button>
+      </div>
+    </section>
+
+    <section class="group grow">
+      <div class="head-row">
+        <h3>Voice SOS</h3>
+        <button class="switch" id="hqSwitch" role="switch" aria-checked="true"><span>HQ online</span></button>
+      </div>
+      <ol class="sos" id="sosList"></ol>
+    </section>
+
+    <section class="group legend" aria-label="Legend">
+      <ul>
+        <li><i class="k van"></i>Van</li>
+        <li><i class="k home"></i>Waiting</li>
+        <li><i class="k done"></i>Served</li>
+        <li><i class="k twice"></i>Served twice</li>
+        <li><i class="k link"></i>Radio link</li>
+        <li><i class="k jam"></i>Jammed</li>
+      </ul>
+    </section>
+  </aside>
+</main>
+
+<script type="module" src="ui.js"></script>
+</body>
+</html>

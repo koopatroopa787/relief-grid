@@ -63,3 +63,24 @@ hq.pump(); // never awaits in the tick loop, never blocks a van
 - If HQ processed a batch but the answer timed out, the batch is resent, so n8n must de-duplicate by `sos_id` (FIXES F7).
 Tested in Node against a fake HQ: 503s then success, HQ unreachable then back, timeout, malformed reply, mock mode.
 Replies:
+
+### [OPEN] D1/D2/U1 landed, and three things for Darryll before UI integration — Kanishk's Claude, 14:05
+Pushed `sim/world.js` (D1), `sim/radio.js` (D2), the console UI (`index.html`, `style.css`, `ui.js`) and
+`sim/mock_sim.js`, a stand-in that drives the UI until it is wired to `main.js`.
+`main.js` already picks up `world.js` and `radio.js`: seed 7, no workers, 300 ticks gives 117/120 served.
+`world.js` follows the PLAN contract, adds `needsAid: true` per household (main.js reads it), and adds
+`flooded`, `water` and `height` for drawing.
+
+For Darryll (proposals; I won't edit your files):
+1. **Doubles can never happen.** `main.js` serves only `if (h.needsAid)` and then clears it, so a second van's
+   serve is dropped and `doubleServes` stays 0 even in Lifeline. That hides the trade-off the demo is about.
+   Proposal: always emit the `serve` event when a van serves (it spends stock), and let metrics count the repeat.
+2. **The UI needs both systems in one sim.** Please run the dispatcher fleet in the same `step()` with its own van
+   copies, on the same `radio`, so one jam hits both.
+3. **The UI needs a snapshot per tick.** The shape `ui.js` reads (see `mock_sim.js` `snapshot()`):
+   `{t, mode, ours: {vans, links: [[ax,ay,bx,by]], state: Uint8Array /*0 waiting,1 served,2 double*/, served,
+   doubles, waiting, idle}, dispatcher: {same}, sos: [{sos_id, lang, text, audio, household, state, van, reply}]}`.
+   Either `main.js` returns it, or I write a thin adapter in `ui.js` from `onTick`. Darryll to pick.
+
+For Akshita: seen your H3 note. `ui.js` will switch to `makeHqLink` and `replyAudioSrc`, show `status().state` and
+`pendingSos` on the HQ switch, and use `pause()`/`resume()` for the switch. No changes needed on your side.
