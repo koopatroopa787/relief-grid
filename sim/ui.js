@@ -35,9 +35,31 @@ const flaps = Object.fromEntries(['flapT', 'oServed', 'oDouble', 'oIdle', 'dServ
 // Land is terraced by height, the flood is a flat sheet below it, homes and vans are small extruded blocks.
 // ponytail: plain painter's order (row by row) is enough for a grid this size; no depth buffer.
 let colors;
+// Canvas in older Safari ignores oklch() colours and paints black, so hand the canvas plain rgb() strings.
+function oklchToRgb(value) {
+  const m = /^oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)\s*(?:\/\s*([\d.]+)(%?))?\s*\)$/i.exec(value);
+  if (!m) return value;
+  const L = m[2] ? m[1] / 100 : +m[1], C = +m[3], h = (m[4] * Math.PI) / 180;
+  const A = m[5] === undefined ? 1 : m[6] ? m[5] / 100 : +m[5];
+  const a = C * Math.cos(h), b = C * Math.sin(h);
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const lin = [
+    4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+  ];
+  const [r, g, bl] = lin.map((x) => {
+    const v = x <= 0.0031308 ? 12.92 * x : 1.055 * Math.max(x, 0) ** (1 / 2.4) - 0.055;
+    return Math.round(Math.min(1, Math.max(0, v)) * 255);
+  });
+  return `rgba(${r}, ${g}, ${bl}, ${A})`;
+}
+
 function readColors() {
   colors = Object.fromEntries(['paper', 'paper-2', 'paper-3', 'ink', 'ink-2', 'ink-3', 'rule', 'rule-2', 'signal', 'signal-lo', 'twice',
-    'land', 'road', 'water', 'bldg', 'bldg-top', 'roof', 'slab', 'shade'].map((k) => [k, css('--' + k)]));
+    'land', 'road', 'water', 'bldg', 'bldg-top', 'roof', 'slab', 'shade'].map((k) => [k, oklchToRgb(css('--' + k))]));
 }
 
 const STEPS = 4;      // gentle hills: terrace levels above the flood
@@ -576,7 +598,7 @@ function backdrop() {
   const fit = () => { dpr = Math.min(2, devicePixelRatio || 1); W = c.width = innerWidth * dpr; H = c.height = innerHeight * dpr; };
   addEventListener('resize', fit); fit();
   addEventListener('pointermove', (e) => { tx = e.clientX * dpr; ty = e.clientY * dpr; }, { passive: true });
-  const ink = css('--ink');
+  const ink = oklchToRgb(css('--ink'));
   function paint(now) {
     requestAnimationFrame(paint);
     if (now - last < 33) return; // ~30 fps is plenty for a backdrop
