@@ -360,3 +360,17 @@ input[type="range"]::-moz-range-thumb { width: 10px; height: 18px; background: v
   .flap b.turn, .mark span { animation: none; }
   * { transition-duration: 1ms !important; }
 }
+
+/* ── HQ pipeline inside the SOS panel ── */
+.hq { margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--ink); background: var(--paper-2); }
+.hq .tag { margin: 0 0 var(--space-2); font: 600 0.72rem var(--font-data); text-transform: uppercase; }
+.pipe { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+.pipe li { position: relative; font: 500 0.74rem/1.3 var(--font-data); }
+.pipe li + li::before { content: "→"; position: absolute; left: calc(-1 * var(--space-2) - 2px); color: var(--ink-2); }
+.pipe b { display: block; font-weight: 700; }
+.pipe small { color: var(--ink-2); }
+.hqline { margin: var(--space-2) 0 0; font: 500 0.74rem/1.4 var(--font-data); color: var(--ink-2); }
+.hqline[data-s="up"] { color: var(--ink); }
+.hqline[data-s="down"] { color: var(--signal-tx); }
+.sos .triage { display: block; margin-top: 2px; font: 500 0.7rem/1.35 var(--font-data); color: var(--ink-2); white-space: normal; }
+.sos .triage .urgent { color: var(--signal-tx); font-weight: 700; }

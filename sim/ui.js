@@ -411,12 +411,26 @@ function setMode(m) {
   render();
 }
 
+// One line under the HQ pipeline: is the real n8n HQ connected, and what has it done.
+function renderHqLine(snap, hq) {
+  const el = $('hqLine');
+  if (!el || !hq) return;
+  const replied = snap.sos.filter((x) => x.state === 'replied').length;
+  el.dataset.s = !snap.hqOnline || hq.state === 'down' ? 'down' : hq.state;
+  el.textContent =
+    hq.state === 'mock' ? 'Mock HQ: text-only replies. Open the page with ?hq=<n8n URL> to use the live workflow.'
+    : !snap.hqOnline ? `HQ offline: vans keep ${hq.pendingSos} SOS queued and retry when it is back.`
+    : hq.state === 'down' ? `HQ unreachable: ${hq.pendingSos} SOS queued, retrying (${hq.lastError || 'no answer'}).`
+    : `Live n8n HQ · ${replied} replied · ${hq.pendingSos} queued${hq.inFlight ? ' · processing a batch now' : ''}`;
+}
+
 const SOS_STATE = { waiting: 'Waiting', carried: 'With', at_hq: 'At HQ', replied: 'Replied' };
 function renderSos(snap) {
   const hq = sim.hqStatus?.();
-  const key = snap.sos.map((s) => s.state + s.van).join() + snap.hqOnline + (hq ? hq.state + hq.pendingSos : '');
+  const key = snap.sos.map((s) => s.state + s.van).join() + snap.hqOnline + (hq ? hq.state + hq.pendingSos + hq.sent : '');
   if (key === sosKey) return;
   sosKey = key;
+  renderHqLine(snap, hq);
   const list = $('sosList');
   if (!snap.sos.length) { list.innerHTML = '<li class="empty">No SOS notes in this flood.</li>'; return; }
   list.innerHTML = '';
@@ -429,6 +443,13 @@ function renderSos(snap) {
       <span><span class="who">${s.household} · ${s.lang.toUpperCase()}</span><br><span class="line" lang="${s.lang}" dir="auto"></span></span>
       <span class="state" data-s="${s.state}">${label}</span>`;
     li.querySelector('.line').textContent = s.reply?.text || s.text;
+    if (s.reply?.english) {
+      const t = document.createElement('span');
+      t.className = 'triage';
+      t.textContent = `HQ heard: "${s.reply.english}"` + (s.reply.needs?.length ? ` · needs ${s.reply.needs.join(', ')}` : '');
+      if (s.reply.urgency >= 3) t.insertAdjacentHTML('beforeend', ' · <span class="urgent">URGENT</span>');
+      li.querySelector('.line').after(t);
+    }
     if (audio) li.querySelector('.play').addEventListener('click', () => new Audio(audio).play().catch(() => {}));
     list.append(li);
   }

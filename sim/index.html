@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -154,9 +154,18 @@
     <button class="switch" id="hqSwitch" role="switch" aria-checked="true"><span>HQ online</span></button>
   </div>
   <p class="hint">Carried van to van, then to HQ for transcription and a spoken reply.</p>
+  <div class="hq" aria-label="HQ pipeline">
+    <p class="tag">[HQ] n8n workflow</p>
+    <ol class="pipe">
+      <li><b>ElevenLabs Scribe</b><small>transcribe, any language</small></li>
+      <li><b>Claude</b><small>translate, triage needs and urgency</small></li>
+      <li><b>ElevenLabs voice</b><small>spoken reply in their language</small></li>
+    </ol>
+    <p class="hqline" id="hqLine"></p>
+  </div>
   <ol class="sos" id="sosList"></ol>
 </section>
 
-<script type="module" src="ui.js?v=3"></script>
+<script type="module" src="ui.js?v=4"></script>
 </body>
 </html>
