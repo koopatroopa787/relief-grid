@@ -36,8 +36,19 @@ The dispatcher's vans stop and wait for orders. Ours keep serving, and the "serv
 - **HQ can fail.** Turn HQ off mid-demo: the field doesn't notice, vans keep the notes and retry, and the backlog
   flushes when HQ returns.
 
-On our demo seed, with the base tower jammed, Relief Grid served 117 of 120 homes with zero double serves while the
-dispatcher served none. With a working radio the dispatcher is faster, and we say so: Relief Grid is for when it isn't.
+Across 50 random cities (`node sim/bench.js`, averages):
+
+| Scenario (300 ticks, 50 seeds) | Relief Grid served | Served twice | Dispatcher served |
+|---|:---:|:---:|:---:|
+| Radio clear | 120.0 / 120 | 0 | 120.0 / 120 |
+| 30% packet loss | 119.9 / 120 | 0 | 120.0 / 120 |
+| Base tower jammed | 119.8 / 120 | 0 | 0 / 120 |
+| Full radio blackout | 116.8 / 120 | 0 | 0 / 120 |
+| Base jammed, Lifeline mode | 119.7 / 120 | 16.6 per run | 0 / 120 |
+
+In Safe mode no home was served twice in any run, even in a full blackout. With a working radio the dispatcher gets
+there faster, and we say so: Relief Grid is for when the radio isn't working. Lifeline trades double serves for speed,
+and counts every one.
 
 ## How we built it
 

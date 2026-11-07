@@ -7,6 +7,22 @@ and a guarantee that no household is served twice. Built at GreatUniHack 2026 fo
 
 **[Watch the 2-minute demo on YouTube](https://youtu.be/gYtxgIP4elE)** · [Google Drive copy](https://drive.google.com/file/d/15dHji0a7RJZlSkJChcY4BRaMA3YlqenP/view?usp=sharing)
 
+## Results
+
+Across 50 random cities, run headless with `node sim/bench.js` (about 10 s), or in the browser at `sim/bench.html`:
+
+| Scenario (300 ticks, 50 seeds) | Relief Grid served | Served twice | Dispatcher served |
+|---|:---:|:---:|:---:|
+| Radio clear | 120.0 / 120 | 0 | 120.0 / 120 |
+| 30% packet loss | 119.9 / 120 | 0 | 120.0 / 120 |
+| Base tower jammed | 119.8 / 120 | 0 | 0 / 120 |
+| Full radio blackout | 116.8 / 120 | 0 | 0 / 120 |
+| Base jammed, Lifeline mode | 119.7 / 120 | 16.6 per run | 0 / 120 |
+
+With a clear radio the dispatcher gets there faster; Relief Grid is for when the radio isn't working.
+
+## Project docs
+
 - The plan, interfaces and demo: [`PLAN.md`](PLAN.md)
 - Who is doing what: [`TASKS.md`](TASKS.md)
 - Proposals and questions: [`DISCUSSION.md`](DISCUSSION.md)
