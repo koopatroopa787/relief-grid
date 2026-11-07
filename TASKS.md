@@ -34,7 +34,7 @@ Status: `todo` → `doing` → `done`. Claim a task (set `doing`) and push befor
 
 | ID | Task | Status |
 |---|---|---|
-| H1 | n8n workflow: webhook → ElevenLabs Scribe (transcribe + translate) → LLM extracts needs → dedupe by `sos_id` and household → Google Sheet log → Slack/Telegram alert if urgent → ElevenLabs voice reply → respond. Export to `hq/workflow.json` | done (real API keys still to add) |
+| H1 | n8n workflow: webhook → ElevenLabs Scribe (transcribe + translate) → LLM extracts needs → dedupe by `sos_id` and household → Google Sheet log → Slack/Telegram alert if urgent → ElevenLabs voice reply → respond. Export to `hq/workflow.json` | done (tested with real keys) |
 | H2 | **Handed over to Darryll (14:58).** Sample SOS clips + driver phrase bank, recorded with ElevenLabs, in `sim/samples/` (brief in `DISCUSSION.md`, "H2 handover"). Darryll may create and edit `sim/samples/` and `hq/samples/` for this task | todo |
 | H3 | `sim/hq_link.js`: POST batches per `PLAN.md` contract, keep and retry when HQ is down | done |
 

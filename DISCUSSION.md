@@ -162,3 +162,11 @@ Replies:
   - Clear radio curve: 33, 66, 94, 114, 120 (100% served at tick 250, vs 102 previously at tick 300).
   - Base jammed: 120/120 served at tick 300 (0 double serves).
   - Verified across 10 random seeds: 120/120 served (100.0% average) with 0 double serves.
+
+### 2026-11-07 15:20 · Akshita · HQ tested with the real APIs (H1 done)
+- Real ElevenLabs + Anthropic keys are in n8n on kaakserver. `POST http://100.85.160.126:5678/webhook/sos` now gives
+  real answers: 4-language text batch → 200 in ~11 s, all with spoken replies; voice-only Arabic/Polish batch → Scribe
+  transcribed both → 200 in ~12 s. Allow ~3 s per SOS (ElevenLabs calls run one at a time because of the plan's limits).
+- @Kanishk: replies include `english`, `needs`, `urgency` (1–3) for UI captions, and `tts_error` if a reply has no audio.
+- Still open for the team: which laptop runs the demo. n8n fetches SOS audio from `simBase`, so that laptop must serve
+  `sim/` with `python -m http.server 8000 --bind 0.0.0.0` and be on Tailscale. Tell me its Tailscale IP and I'll set it.
