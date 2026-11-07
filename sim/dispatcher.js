@@ -70,6 +70,25 @@ export function makeCentralDispatcher({ base = { x: 0, y: 0 }, vanIds = [] } = {
             stock: msg.stock,
             lastSeen: t,
           };
+          // If the van asks for work, re-send pending assignment if still valid (order was dropped in transit)
+          const assignedId = this.assignments[msg.vanId];
+          if (assignedId) {
+            const targetH = households.find(h => h.id === assignedId);
+            if (targetH && !this.served[assignedId] && targetH.needsAid !== false) {
+              if (radio && typeof radio.send === 'function') {
+                radio.send('base', msg.vanId, {
+                  type: 'assign',
+                  household: {
+                    id: targetH.id,
+                    x: targetH.x,
+                    y: targetH.y,
+                  },
+                });
+              }
+            } else {
+              this.assignments[msg.vanId] = null;
+            }
+          }
         }
       }
 
@@ -204,7 +223,7 @@ export function stepDispatcherVan(state, percept) {
   } else {
     // No assignment: van is idle waiting for central dispatcher
     // Periodically send request to base
-    if (percept.t % 5 === 0) {
+    if (percept.t % 2 === 0) {
       action.outbox.push({
         to: 'base',
         msg: {

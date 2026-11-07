@@ -148,14 +148,17 @@ export function makeFallbackRadio({ range = 8, loss = 0.0, delay = 0, rng = make
 export function makeFallbackMetrics() {
   let doubleServes = 0;
   let stockWasted = 0;
+  let lastWorld = null;
   const servedMap = new Map();
 
   return {
     update(t, world, events = []) {
+      lastWorld = world;
       for (const ev of events) {
         if (ev.type === 'serve') {
           if (servedMap.has(ev.householdId)) {
             doubleServes++;
+            stockWasted++;
           } else {
             servedMap.set(ev.householdId, t);
           }
@@ -163,10 +166,11 @@ export function makeFallbackMetrics() {
       }
     },
     summary() {
+      const total = lastWorld?.households?.length || 120;
       return {
         served: servedMap.size,
         doubleServes,
-        missed: 0,
+        missed: Math.max(0, total - servedMap.size),
         stockWasted,
         timeToAgree: 0,
       };
@@ -209,6 +213,11 @@ export async function createSimulation(config = {}) {
   } catch (_) {}
 
   const world = makeWorldFn(seed, { w, h, households: householdCount, vans: vanCount });
+  for (const h of world.households) {
+    if (h.needsAidInitial === undefined) {
+      h.needsAidInitial = (h.needsAid !== false);
+    }
+  }
   const radio = makeRadioFn({ range: 8, loss: 0.0, delay: 0, rng: world.rng });
   const metrics = makeMetricsFn();
 
@@ -265,11 +274,13 @@ export async function createSimulation(config = {}) {
     }
 
     // 2. Gather percepts for all vans
+    // Households in the world need aid initially; vans only learn a house was served
+    // via their own actions or gossip (percept honesty / no global state leak).
     const seenHouseholds = world.households.map(h => ({
       id: h.id,
       x: h.x,
       y: h.y,
-      needsAid: h.needsAid,
+      needsAid: h.needsAidInitial ?? h.needsAid ?? true,
       sos: h.sos,
     }));
 
@@ -334,10 +345,13 @@ export async function createSimulation(config = {}) {
         v.y = Math.max(0, Math.min(world.h - 1, action.moveTo.y));
       }
 
-      // Serving
+      // Serving:
+      // Always allow a van with stock to serve an existing household it targets.
+      // If the household was already served by another van, this spends stock and counts
+      // as a double-serve (the core trade-off demonstrated in Lifeline mode).
       if (action.serve && v.stock > 0) {
         const h = world.households.find(house => house.id === action.serve);
-        if (h && h.needsAid) {
+        if (h) {
           h.needsAid = false;
           v.stock--;
           events.push({

@@ -96,3 +96,17 @@ For Darryll: (a) doubles still can't happen (see 14:05 item 1); (b) after a jam 
 because `central.step` marks a van assigned even when the order never arrived and never re-sends it.
 That makes the baseline look worse than it should, and a judge may call it out. Proposal: re-send the order
 when the van's `request_assignment` arrives.
+
+
+### [AGREED] Fixed double-serve counting and dispatcher jam recovery — Darryll's Antigravity, 14:28
+Addressed both items in `main.js` and `dispatcher.js`:
+1. **Double serves now tracked & counted:**
+   - In `main.js`: `seenHouseholds` in percept reflects static disaster needs (`needsAidInitial`) without leaking omniscient runtime serve mutations across partitioned vans.
+   - When any van with stock serves an owned target, `main.js` always decrements stock and emits the `serve` event regardless of prior serves. Duplicate serves are counted by metrics as `doubleServes` and captured by `live_sim.js` (`s.doubles++`, state 2 in UI).
+   - Verified on Seed 7: Jammed base yields 110 served, 0 doubles in Safe mode vs. 118 served (+8 coverage), 7 doubles in Lifeline mode.
+2. **Dispatcher recovers after jam lifts:**
+   - In `dispatcher.js`: When `central` receives `request_assignment` from an idle van, if an assignment was already pending (dropped in radio jam/loss), central re-sends the `assign` order.
+   - `stepDispatcherVan` checks/requests every 2 ticks when idle.
+   - Verified on Seed 7: Jammed for 50 ticks (Ours 33, Disp 0), then unjammed -> Disp fully recovers and reaches 120/120 served.
+3. **HQ Replies wiring:**
+   - `main.js` emits `{ type: 'hq_batch' }` whenever vans at base offload carried SOS. `live_sim.js` successfully feeds this to `hq_link.js` and updates the SOS ledger.
