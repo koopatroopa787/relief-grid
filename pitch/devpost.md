@@ -85,7 +85,7 @@ when the radio isn't working.
 - **A fair radio.** Range, packet loss, delay and jamming are all modelled. The dispatcher uses the same radio, just
   with a longer tower range, so it's a fair fight.
 - **HQ is an n8n workflow** behind a webhook: reply cache, ElevenLabs Scribe to transcribe, Claude to translate and
-  triage, ElevenLabs text-to-speech for the reply, and a Slack alert if it's urgent. Every step fails soft, and repeat
+  triage, and ElevenLabs text-to-speech for the reply. Every step fails soft, and repeat
   batches are answered from the cache, so a van that retries never triggers a second paid call.
 - **The console** is a hand-drawn isometric city on canvas, in the style of a printed ops sheet: roads, buildings, the
   flood, vans, radio links and jammed zones, with split-flap counters and a live chart of homes served.
