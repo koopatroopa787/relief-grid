@@ -1,0 +1,527 @@
+{
+  "id": "reliefGridHQ0001",
+  "name": "Relief Grid HQ",
+  "nodes": [
+    {
+      "id": "rg-node-01",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sos",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "SOS batch in",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "6f1c2a9e-5d3b-4e8a-9c71-2b4f0d9e8a11"
+    },
+    {
+      "id": "rg-node-02",
+      "parameters": {
+        "jsCode": "// n8n Code node \"Check cache\" (Run Once for All Items)\n// First step after the webhook. Holds the config, splits the batch into SOS notes HQ has\n// already answered (cached) and new ones (fresh). This is the cross-run de-duplication (FIXES F7):\n// the same SOS can arrive in two vans' batches, or be resent after a timeout, and is handled once.\n// The cache lives in n8n's workflow static data, which persists between PRODUCTION executions\n// (workflow active, called on /webhook/sos), not between manual test runs.\n\n// ---- Config: edit these ----\nconst CONFIG = {\n  simBase: 'http://localhost:8000/',          // where the sim serves SOS audio (relative `audio` paths resolve here)\n  elevenBase: 'https://api.elevenlabs.io',\n  anthropicBase: 'https://api.anthropic.com',\n  claudeModel: 'claude-opus-5-5',\n  claudeEffort: 'low',                         // fast triage; raise to 'medium' if replies look weak\n  voiceId: 'JBFqnCBsd6RMkjVDRZzb',             // any ElevenLabs voice id; pick one that sounds good in Arabic/Urdu\n  ttsModel: 'eleven_multilingual_v2',\n  slackWebhookUrl: '',                         // optional Slack incoming-webhook URL for urgent SOS alerts\n};\n// ----------------------------\n\nconst body = $input.first().json.body || {};\nconst batch = Array.isArray(body.batch) ? body.batch : [];\n\nconst store = $getWorkflowStaticData('global');\nstore.replies = store.replies || {};\n\nconst fresh = [];\nconst cached = [];\nconst seen = new Set();\nfor (const sos of batch) {\n  if (!sos || !sos.sos_id || seen.has(sos.sos_id)) continue;\n  seen.add(sos.sos_id);\n  if (store.replies[sos.sos_id]) cached.push(store.replies[sos.sos_id]);\n  else fresh.push(sos);\n}\n\nreturn [{ json: { cfg: CONFIG, van: body.van ?? null, t: body.t ?? null, fresh, cached } }];\n"
+      },
+      "name": "Check cache",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "id": "rg-node-03",
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "Anything new?-0",
+              "leftValue": "={{ $json.fresh.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Anything new?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "id": "rg-node-04",
+      "parameters": {
+        "jsCode": "// n8n Code node \"One item per SOS\" (Run Once for All Items)\n// Turns the fresh SOS list into one n8n item each, with an absolute audio URL to download.\n\nconst { cfg, fresh } = $input.first().json;\n\nfunction toUrl(audio, base) {\n  if (!audio) return '';\n  if (/^https?:\\/\\//.test(audio)) return audio;\n  return base.replace(/\\/+$/, '') + '/' + String(audio).replace(/^\\/+/, '');\n}\n\nreturn fresh.map(sos => ({\n  json: {\n    sos_id: sos.sos_id,\n    household: sos.household,\n    lang: sos.lang || null,\n    text: sos.text || null,\n    audio_url: toUrl(sos.audio, cfg.simBase),\n  },\n}));\n"
+      },
+      "name": "One item per SOS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        200
+      ]
+    },
+    {
+      "id": "rg-node-05",
+      "parameters": {
+        "url": "={{ $json.audio_url }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "name": "Fetch SOS audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        200
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "rg-node-06",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Check cache').first().json.cfg.elevenBase }}/v1/speech-to-text",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model_id",
+              "value": "scribe_v1"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "ElevenLabs Scribe: transcribe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        200
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "rgElevenLabsKey1",
+          "name": "ElevenLabs API key"
+        }
+      }
+    },
+    {
+      "id": "rg-node-07",
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// n8n Code node \"Pick transcript\" (Run Once for Each Item)\n// Takes ElevenLabs Scribe's transcript, or falls back to the SOS's own text if there was no audio\n// or transcription failed. Builds the Claude request for the next node.\n\nconst sos = $('One item per SOS').item.json;\nconst cfg = $('Check cache').first().json.cfg;\nconst stt = $json || {};\n\nconst sttText = typeof stt.text === 'string' ? stt.text.trim() : '';\nconst transcript = sttText || (sos.text || '').trim();\nconst lang = stt.language_code || sos.lang || 'en';\nconst ok = transcript.length > 0;\nconst sttError = stt.error ? String(stt.error.message || stt.error) : null;\n\nconst system = [\n  'You triage voice SOS messages for a flood-relief operation whose radios and phones are down.',\n  \"Each message was recorded on an aid van's device when the van delivered rations to a household,\",\n  'and carried back to HQ. The transcript may be in any language. Return:',\n  '- english: a faithful English translation.',\n  '- needs: short list of concrete needs, e.g. \"insulin\", \"baby formula\", \"drinking water\". Empty if none.',\n  '- urgency: 3 if life-threatening or medical (medication, injury, infant, pregnant, elderly person alone),',\n  '  2 if important but not life-threatening, 1 otherwise.',\n  '- people: number of people mentioned, or 0 if unknown.',\n  '- reply: a short spoken reply to the household in the language of the transcript, at most two sentences,',\n  '  warm and plain. Confirm what HQ understood and that it will go out with the next van.',\n  '  Never promise a specific time, van or item.',\n  '- reply_lang: ISO 639-1 code of the reply language.',\n].join('\\n');\n\nconst schema = {\n  type: 'object',\n  properties: {\n    english: { type: 'string' },\n    needs: { type: 'array', items: { type: 'string' } },\n    urgency: { type: 'integer' },\n    people: { type: 'integer' },\n    reply: { type: 'string' },\n    reply_lang: { type: 'string' },\n  },\n  required: ['english', 'needs', 'urgency', 'people', 'reply', 'reply_lang'],\n  additionalProperties: false,\n};\n\nconst claudeRequest = {\n  model: cfg.claudeModel,\n  max_tokens: 4000,\n  fallbacks: 'default',\n  output_config: { effort: cfg.claudeEffort, format: { type: 'json_schema', schema } },\n  system,\n  messages: [{\n    role: 'user',\n    content: `Household: ${sos.household}\\nLanguage detected by speech recognition: ${lang}\\nTranscript:\\n\"\"\"\\n${transcript}\\n\"\"\"`,\n  }],\n};\n\nreturn { json: { sos, transcript, lang, ok, sttError, claudeRequest } };\n"
+      },
+      "name": "Pick transcript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        200
+      ]
+    },
+    {
+      "id": "rg-node-08",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Check cache').first().json.cfg.anthropicBase }}/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2026-10-21"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "server-side-fallback-2026-07-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.claudeRequest) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "name": "Claude: translate, triage, reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        200
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "rgAnthropicKey01",
+          "name": "Anthropic API key"
+        }
+      }
+    },
+    {
+      "id": "rg-node-09",
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// n8n Code node \"Parse triage\" (Run Once for Each Item)\n// Reads Claude's JSON answer. If Claude failed or declined, falls back to a fixed reply in the\n// household's language so the household still hears something (marked degraded).\n\nconst prev = $('Pick transcript').item.json;\nconst cfg = $('Check cache').first().json.cfg;\nconst res = $json || {};\n\nconst FALLBACK_REPLY = {\n  en: 'Your message reached HQ. Help will come with the next van.',\n  ar: 'وصلت رسالتك إلى المقر. ستصل المساعدة مع الشاحنة التالية.',\n  ur: 'آپ کا پیغام ہیڈکوارٹر تک پہنچ گیا ہے۔ اگلی وین کے ساتھ مدد پہنچے گی۔',\n};\n\nlet triage = null;\nlet claudeError = null;\nif (prev.ok) {\n  try {\n    if (res.error) throw new Error(String(res.error.message || JSON.stringify(res.error)));\n    if (res.stop_reason === 'refusal') throw new Error('Claude declined the request');\n    const textBlock = (res.content || []).find(b => b.type === 'text');\n    if (!textBlock) throw new Error('No text block in Claude response');\n    triage = JSON.parse(textBlock.text);\n  } catch (err) {\n    claudeError = String(err.message || err);\n  }\n}\n\nconst lang2 = String(prev.lang || 'en').slice(0, 2).toLowerCase();\nconst degraded = !triage;\nif (!triage) {\n  triage = {\n    english: prev.transcript,\n    needs: [],\n    urgency: 2,\n    people: 0,\n    reply: FALLBACK_REPLY[lang2] || FALLBACK_REPLY.en,\n    reply_lang: FALLBACK_REPLY[lang2] ? lang2 : 'en',\n  };\n}\n\nreturn {\n  json: {\n    sos: prev.sos,\n    ok: prev.ok,\n    transcript: prev.transcript,\n    lang: prev.lang,\n    triage,\n    degraded,\n    errors: { stt: prev.sttError, claude: claudeError },\n    ttsRequest: { text: triage.reply, model_id: cfg.ttsModel },\n  },\n};\n"
+      },
+      "name": "Parse triage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        200
+      ]
+    },
+    {
+      "id": "rg-node-10",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Check cache').first().json.cfg.elevenBase }}/v1/text-to-speech/{{ $('Check cache').first().json.cfg.voiceId }}?output_format=mp3_44100_64",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.ttsRequest) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "name": "ElevenLabs: spoken reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        200
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "rgElevenLabsKey1",
+          "name": "ElevenLabs API key"
+        }
+      }
+    },
+    {
+      "id": "rg-node-11",
+      "parameters": {
+        "jsCode": "// n8n Code node \"Build replies\" (Run Once for All Items)\n// Joins each triaged SOS with its spoken reply (base64 MP3), caches successful replies so a resent\n// SOS is answered without reprocessing, and builds the webhook response.\n// If any SOS could not be transcribed, answers 503 so the sim's hq_link keeps the batch and retries;\n// the ones that worked are cached, so the retry only redoes the failures.\n\nconst head = $('Check cache').first().json;\nconst triaged = $('Parse triage').all();\nconst tts = $input.all();\n\nconst store = $getWorkflowStaticData('global');\nstore.replies = store.replies || {};\n\nconst replies = [...head.cached];\nconst failed = [];\nconst urgent = [];\n\nfor (let i = 0; i < triaged.length; i++) {\n  const p = triaged[i].json;\n  if (!p.ok) {\n    failed.push({ sos_id: p.sos.sos_id, why: p.errors.stt || 'no audio and no text' });\n    continue;\n  }\n  let audio_b64 = null;\n  const item = tts[i];\n  if (item && item.binary && item.binary.data) {\n    try {\n      audio_b64 = (await this.helpers.getBinaryDataBuffer(i, 'data')).toString('base64');\n    } catch (err) {\n      audio_b64 = null; // reply still goes out as text\n    }\n  }\n  const reply = {\n    sos_id: p.sos.sos_id,\n    household: p.sos.household,\n    lang: p.triage.reply_lang || p.lang,\n    text: p.triage.reply,\n    audio_b64,\n    mime: 'audio/mpeg',\n    english: p.triage.english,\n    needs: p.triage.needs,\n    urgency: p.triage.urgency,\n    degraded: p.degraded,\n  };\n  store.replies[reply.sos_id] = reply;\n  replies.push(reply);\n  if (reply.urgency >= 3) urgent.push(reply);\n}\n\nconst status = failed.length ? 503 : 200;\nconst response = failed.length\n  ? { error: 'Some SOS notes could not be transcribed; resend the batch later.', failed, replies }\n  : { replies };\n\nreturn [{ json: { status, response, urgent, slack: head.cfg.slackWebhookUrl, van: head.van, t: head.t } }];\n"
+      },
+      "name": "Build replies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        200
+      ]
+    },
+    {
+      "id": "rg-node-12",
+      "parameters": {
+        "jsCode": "// n8n Code node \"Cached replies only\" (Run Once for All Items)\n// Every SOS in the batch was already answered: return the stored replies without calling any API.\n\nconst { cached } = $input.first().json;\nreturn [{ json: { status: 200, response: { replies: cached }, urgent: [], slack: '' } }];\n"
+      },
+      "name": "Cached replies only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        420
+      ]
+    },
+    {
+      "id": "rg-node-13",
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.response) }}",
+        "options": {
+          "responseCode": "={{ $json.status }}"
+        }
+      },
+      "name": "Respond to sim",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2860,
+        300
+      ]
+    },
+    {
+      "id": "rg-node-14",
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "Urgent and Slack set?-0",
+              "leftValue": "={{ ($json.urgent || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "Urgent and Slack set?-1",
+              "leftValue": "={{ $json.slack || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Urgent and Slack set?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        300
+      ]
+    },
+    {
+      "id": "rg-node-15",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.slack }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: '🚨 Urgent SOS at HQ\\n' + $json.urgent.map(r => r.household + ': ' + r.english + (r.needs.length ? ' (needs: ' + r.needs.join(', ') + ')' : '')).join('\\n') }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "Slack: urgent SOS alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3300,
+        200
+      ],
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "SOS batch in": {
+      "main": [
+        [
+          {
+            "node": "Check cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check cache": {
+      "main": [
+        [
+          {
+            "node": "Anything new?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anything new?": {
+      "main": [
+        [
+          {
+            "node": "One item per SOS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cached replies only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One item per SOS": {
+      "main": [
+        [
+          {
+            "node": "Fetch SOS audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch SOS audio": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs Scribe: transcribe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs Scribe: transcribe": {
+      "main": [
+        [
+          {
+            "node": "Pick transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick transcript": {
+      "main": [
+        [
+          {
+            "node": "Claude: translate, triage, reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: translate, triage, reply": {
+      "main": [
+        [
+          {
+            "node": "Parse triage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse triage": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs: spoken reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs: spoken reply": {
+      "main": [
+        [
+          {
+            "node": "Build replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build replies": {
+      "main": [
+        [
+          {
+            "node": "Respond to sim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cached replies only": {
+      "main": [
+        [
+          {
+            "node": "Respond to sim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to sim": {
+      "main": [
+        [
+          {
+            "node": "Urgent and Slack set?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Urgent and Slack set?": {
+      "main": [
+        [
+          {
+            "node": "Slack: urgent SOS alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false
+}

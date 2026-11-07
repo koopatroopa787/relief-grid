@@ -24,7 +24,7 @@
 const DEFAULTS = {
   url: null,                 // e.g. 'http://localhost:5678' (n8n). null + mock:false = queue only, never sends
   path: '/webhook/sos',
-  timeoutMs: 30000,          // transcription + LLM + TTS can take a while
+  timeoutMs: 60000,          // transcription + Claude + TTS per SOS can take a while
   retryBaseMs: 1000,         // first retry after 1s, then 2s, 4s ... up to retryMaxMs
   retryMaxMs: 15000,
   mock: false,
@@ -199,6 +199,11 @@ function normaliseReplies(body, item) {
       audio_url: r.audio_url ?? null,
       audio_b64: r.audio_b64 ?? null,
       mime: r.mime ?? 'audio/mpeg',
+      // Optional extras from the n8n workflow, for UI captions ("HQ understood: insulin, urgent").
+      english: r.english ?? null,
+      needs: Array.isArray(r.needs) ? r.needs : [],
+      urgency: Number.isInteger(r.urgency) ? r.urgency : null,
+      degraded: r.degraded === true,
     }));
 }
 
