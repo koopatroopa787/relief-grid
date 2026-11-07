@@ -210,10 +210,10 @@ so the pitch's numbers (now seed 7 only, see `pitch/script.md` "Numbers") become
 
 **Suggested shape (about 30 min):**
 - `sim/bench.js` imports `createSim` from `live_sim.js` and runs it with `useWorkers: false` (no workers, fast) and no
-  `?hq=` in the URL (mock HQ, no API cost). Loop: `await sim.step()` for 300 ticks, then read `sim.snapshot()`
+  `?hq=` in the URL (mock HQ, no API cost). Loop: `await sim.tick()` 300 times, then read `sim.snapshot()`
   (`ours.served`, `ours.doubles`, `dispatcher.served`).
 - Scenarios, each over seeds 1–50, Safe mode: radio clear; base tower jammed (radius 6, the same `radio.jam` call the
-  UI's jam brush makes, see `ui.js`); 30% packet loss; full blackout. Optionally base jammed in Lifeline (count doubles).
+  UI's jam brush makes: `sim.radio.jam(x, y, 6)` at `sim.world.base`); 30% packet loss (`sim.radio.setLoss(0.3)`); full blackout. Optionally base jammed in Lifeline (count doubles).
 - Output: a table of mean (min–max) homes served out of 120 for each side, plus total double serves, and a simple
   bar chart on a canvas. Add a "Copy as Markdown" button so the numbers can go straight into `pitch/devpost.md`.
 - Don't create `metrics.js` unless you need it: `main.js` already falls back to its built-in metrics, and adding the
