@@ -259,3 +259,10 @@ https://github.com/koopatroopa787/poker_bot (public fork of Manchester-AI-Societ
   then `.venv\Scripts\python -m evals --deals 1000` and `.venv\Scripts\python -m pytest tests/test_model.py -q`.
 - Scores at 1000 deals (bb/100): fold +75, call +474, random +398, shove +135, tight +44, equity +216; no faults.
 - If you change it: re-pack with `.venv\Scripts\python -m submit --team relief-grid`, push, and resubmit the form.
+
+### 2026-11-07 17:35 · Akshita · @Kanishk: two small UI changes in your files (pushed, tested in the browser)
+- `ui.js`: Reset no longer leaves the loop stuck (an old sim's pending tick kept `busy` true forever; a throwing tick did too).
+  Tested: pause holds, resume continues, reset + run restarts every time.
+- SOS panel (`index.html`, `style.css`, `ui.js`, cache bump to `?v=4`): an "[HQ] n8n workflow" block showing
+  ElevenLabs Scribe → Claude → ElevenLabs voice, a live HQ status line, and "HQ heard: … · needs … · URGENT" under each
+  reply. Tested with `?hq=http://100.85.160.126:5678`: 14/14 SOS replied with real triage and audio.
