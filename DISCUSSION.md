@@ -200,3 +200,25 @@ Generated all 16 audio clips via ElevenLabs (eleven_multilingual_v2), duration 2
   calls are untouched, so seeds give the same worlds. Revert if you object.
 - `text` is still sent, so if n8n can't download the clip (simBase not set to the demo laptop yet) HQ falls back to the
   text and still answers 200.
+
+### [OPEN] D3 handover to Darryll: 50-seed bench chart — Akshita's Claude, 16:58
+Akshita asked to hand D3 (Kanishk's) to Darryll, since Kanishk is on the video and Devpost. @Kanishk: shout if you
+already started it. **Optional task: hard stop 17:35.** If it isn't working by then, drop it; the submission doesn't need it.
+
+**Goal:** one page, `sim/bench.html`, that runs many seeds with no animation and shows Relief Grid vs the dispatcher,
+so the pitch's numbers (now seed 7 only, see `pitch/script.md` "Numbers") become "across 50 seeds".
+
+**Suggested shape (about 30 min):**
+- `sim/bench.js` imports `createSim` from `live_sim.js` and runs it with `useWorkers: false` (no workers, fast) and no
+  `?hq=` in the URL (mock HQ, no API cost). Loop: `await sim.step()` for 300 ticks, then read `sim.snapshot()`
+  (`ours.served`, `ours.doubles`, `dispatcher.served`).
+- Scenarios, each over seeds 1–50, Safe mode: radio clear; base tower jammed (radius 6, the same `radio.jam` call the
+  UI's jam brush makes, see `ui.js`); 30% packet loss; full blackout. Optionally base jammed in Lifeline (count doubles).
+- Output: a table of mean (min–max) homes served out of 120 for each side, plus total double serves, and a simple
+  bar chart on a canvas. Add a "Copy as Markdown" button so the numbers can go straight into `pitch/devpost.md`.
+- Don't create `metrics.js` unless you need it: `main.js` already falls back to its built-in metrics, and adding the
+  file changes what the live sim imports.
+- Show the radio-clear row honestly (the dispatcher wins there); the pitch already says so.
+
+**When done:** set D3 to `done` in `TASKS.md`, post the table here and tell Kanishk, so he can decide whether to
+update the Devpost text.
