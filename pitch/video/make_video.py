@@ -106,6 +106,42 @@ def split_sentences(text):
     return [s.strip() for s in re.split(r'(?<=[.?!])\s+', text) if s.strip()]
 
 
+KEY_FILE = Path(__file__).resolve().parents[3] / '.elevenlabs_key'  # outside the repo, never committed
+VOICES = {'george': 'JBFqnCBsd6RMkjVDRZzb', 'brian': 'nPczCjzI2devNBz1zQrb', 'daniel': 'onwK4e9ZLuTAKqWW03F9'}
+
+
+def voice_elevenlabs(voice_name='george'):
+    """One ElevenLabs request per segment; previous/next text keeps the delivery continuous across cuts."""
+    import os, urllib.request, wave, imageio_ffmpeg
+    key = os.environ.get('ELEVENLABS_API_KEY') or (KEY_FILE.read_text().strip() if KEY_FILE.exists() else '')
+    if not key: sys.exit(f'No ElevenLabs key: set ELEVENLABS_API_KEY or put it in {KEY_FILE}')
+    ff = imageio_ffmpeg.get_ffmpeg_exe()
+    (OUT / 'voice').mkdir(parents=True, exist_ok=True)
+    vid = VOICES.get(voice_name, voice_name)
+    durations = {}
+    for i, seg in enumerate(SEGMENTS):
+        body = json.dumps({
+            'text': seg['text'], 'model_id': 'eleven_multilingual_v2',
+            'previous_text': SEGMENTS[i - 1]['text'] if i else None,
+            'next_text': SEGMENTS[i + 1]['text'] if i + 1 < len(SEGMENTS) else None,
+            'voice_settings': {'stability': 0.5, 'similarity_boost': 0.8, 'style': 0.15, 'use_speaker_boost': True},
+        }).encode()
+        req = urllib.request.Request(f'https://api.elevenlabs.io/v1/text-to-speech/{vid}?output_format=mp3_44100_128',
+                                     data=body, headers={'xi-api-key': key, 'Content-Type': 'application/json'})
+        try:
+            mp3 = urllib.request.urlopen(req, timeout=120).read()
+        except urllib.error.HTTPError as e:
+            sys.exit(f"ElevenLabs {e.code} on '{seg['id']}': {e.read()[:300].decode(errors='replace')}")
+        src, dst = OUT / 'voice' / f"{seg['id']}.mp3", OUT / 'voice' / f"{seg['id']}.wav"
+        src.write_bytes(mp3)
+        subprocess.run([ff, '-y', '-loglevel', 'error', '-i', str(src), '-ar', '48000', '-ac', '1', str(dst)], check=True)
+        with wave.open(str(dst)) as w: durations[seg['id']] = w.getnframes() / w.getframerate()
+        print(f"{seg['id']:9s} {durations[seg['id']]:5.1f}s")
+    old = json.loads((OUT / 'durations.json').read_text()) if (OUT / 'durations.json').exists() else {}
+    (OUT / 'durations.json').write_text(json.dumps({**old, **durations}, indent=1))
+    print(f"total {sum(durations.values()) + GAP * len(SEGMENTS):.1f}s")
+
+
 def voice(ref=None):
     import torch, torchaudio as ta
     from chatterbox.tts import ChatterboxTTS
@@ -122,7 +158,8 @@ def voice(ref=None):
         ta.save(str(OUT / 'voice' / f"{seg['id']}.wav"), wav, model.sr)
         durations[seg['id']] = wav.shape[1] / model.sr
         print(f"{seg['id']:9s} {durations[seg['id']]:5.1f}s")
-    (OUT / 'durations.json').write_text(json.dumps(durations, indent=1))
+    old = json.loads((OUT / 'durations.json').read_text()) if (OUT / 'durations.json').exists() else {}
+    (OUT / 'durations.json').write_text(json.dumps({**old, **durations}, indent=1))
     print(f"total {sum(durations.values()) + GAP * len(SEGMENTS):.1f}s")
 
 
@@ -135,7 +172,8 @@ async def record(url):
     log = []  # (path, wall timestamp)
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(args=['--ignore-gpu-blocklist', '--enable-gpu-rasterization'])
+        # Installed Edge: no extra browser download (venue Wi-Fi is ~1 MB/s).
+        browser = await p.chromium.launch(channel='msedge', args=['--ignore-gpu-blocklist', '--enable-gpu-rasterization'])
         page = await browser.new_page(viewport={'width': 1920, 'height': 1080}, device_scale_factor=1)
         await page.add_init_script(CURSOR_JS)
         await page.goto(url)
@@ -200,11 +238,14 @@ async def record(url):
         await asyncio.sleep(0.8)
 
         cdp = await page.context.new_cdp_session(page)
+        async def ack(sid):
+            try: await cdp.send('Page.screencastFrameAck', {'sessionId': sid})
+            except Exception: pass  # late ack after the browser closed
         def on_frame(ev):
             path = frames / f"{len(log):06d}.jpg"
             path.write_bytes(base64.b64decode(ev['data']))
             log.append((path.name, ev['metadata']['timestamp']))
-            asyncio.ensure_future(cdp.send('Page.screencastFrameAck', {'sessionId': ev['sessionId']}))
+            asyncio.ensure_future(ack(ev['sessionId']))
         cdp.on('Page.screencastFrame', on_frame)
         await cdp.send('Page.startScreencast', {'format': 'jpeg', 'quality': 92, 'maxWidth': 1920, 'maxHeight': 1080})
         while not log: await asyncio.sleep(0.02)
@@ -257,9 +298,9 @@ def edit(music=True):
         filters.append(f"aevalsrc='({chord})*(0.75+0.25*sin(2*PI*0.06*t))':s=48000:d={total:.2f},lowpass=f=700,"
                        f"aecho=0.8:0.6:180|360:0.25|0.15,volume=0.22,afade=t=in:d=3,afade=t=out:st={total - 4:.2f}:d=4,"
                        f"pan=stereo|c0=c0|c1=c0[pad]")
-        filters.append("[voice]pan=stereo|c0=c0|c1=c0[vs]")
+        filters.append("[voice]pan=stereo|c0=c0|c1=c0,asplit=2[vs][vs2]")  # one copy keys the ducking, one is heard
         filters.append("[pad][vs]sidechaincompress=threshold=0.03:ratio=6:attack=20:release=400[duck]")
-        filters.append("[duck][vs]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1.5[a]")
+        filters.append("[duck][vs2]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1.5[a]")
     else:
         filters.append("[voice]pan=stereo|c0=c0|c1=c0,loudnorm=I=-16:TP=-1.5[a]")
     filters.append(f"[0:v]fps=30,format=yuv420p,fade=t=in:d=0.6,fade=t=out:st={total - 1:.2f}:d=1[v]")
@@ -273,10 +314,16 @@ def edit(music=True):
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('step', choices=['voice', 'record', 'edit'])
-    ap.add_argument('--ref', help='optional reference clip to set the voice (your own voice, with consent)')
+    ap.add_argument('--engine', choices=['elevenlabs', 'chatterbox'], default='elevenlabs')
+    ap.add_argument('--voice', default='george', help='ElevenLabs voice: george, brian, daniel, or a voice id')
+    ap.add_argument('--ref', help='Chatterbox only: reference clip to set the voice (your own voice, with consent)')
     ap.add_argument('--url', default='http://localhost:8000/')
     ap.add_argument('--no-music', action='store_true')
+    ap.add_argument('--only', help='comma-separated segment ids, e.g. hook,title,intro,jam for a starter clip')
     a = ap.parse_args()
-    if a.step == 'voice': voice(a.ref)
+    if a.only:
+        keep = a.only.split(',')
+        SEGMENTS[:] = [s for s in SEGMENTS if s['id'] in keep]
+    if a.step == 'voice': voice_elevenlabs(a.voice) if a.engine == 'elevenlabs' else voice(a.ref)
     elif a.step == 'record': asyncio.run(record(a.url))
     else: edit(not a.no_music)
