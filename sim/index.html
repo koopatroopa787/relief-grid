@@ -19,8 +19,40 @@
 
 <canvas id="bg" aria-hidden="true"></canvas>
 
+<!-- The brief, read top to bottom before the live sheet: problem, how it works, the numbers. -->
+<article class="intro" aria-label="About Relief Grid">
+  <section class="hero">
+    <div class="hero-top"><span class="tag">[Relief Grid] GreatUniHack 2026 · Neptune North</span><a class="tag" href="https://youtu.be/gYtxgIP4elE">[Video] 2-minute demo</a></div>
+    <h1 class="hero-line">Aid that keeps moving <span class="hl">when the radio dies.</span></h1>
+    <div class="hero-foot">
+      <p class="lede">After Hurricane Maria, about 96% of Puerto Rico's cell sites went down. Relief work still assumes someone at a desk can reach every driver. When that link breaks, deliveries stop, or two crews turn up at the same door while the next street waits. Relief Grid is a fleet of six vans that keeps delivering with no dispatcher and no network, and never serves a home twice.</p>
+      <a class="scroll-cue" href="#sim"><span class="tag">[Live]</span> Scroll to run it <span aria-hidden="true">↓</span></a>
+    </div>
+  </section>
+
+  <section class="how" aria-labelledby="howTitle">
+    <h2 class="sec-title" id="howTitle"><span class="tag">[01]</span> How a van decides alone</h2>
+    <ol class="steps">
+      <li><span class="tag">01 · Ownership</span><b>Agree without talking</b><p>Every van hashes each home against the vans it knows are alive. They all pick the same owner, without sending a message, and a van only serves homes it owns.</p></li>
+      <li><span class="tag">02 · Gossip</span><b>Lists that only grow</b><p>When two vans meet, they merge what they've served (a set union) and who's alive, and hand a home to a closer van that still has stock.</p></li>
+      <li><span class="tag">03 · Silence</span><b>Safe or Lifeline</b><p>A van goes quiet: broken, or just out of range? Safe waits, so nothing is served twice. Lifeline hands its homes over and counts every double serve.</p></li>
+      <li><span class="tag">04 · Voice SOS</span><b>HQ that can fail</b><p>Families leave voice notes in their own language. Vans carry them to base, where n8n, ElevenLabs and Claude triage and reply. If HQ dies, vans keep the notes and retry.</p></li>
+    </ol>
+  </section>
+
+  <section class="proof" aria-labelledby="proofTitle">
+    <h2 class="sec-title" id="proofTitle"><span class="tag">[02]</span> 50 random cities, measured</h2>
+    <div class="figs">
+      <div><span class="tag">Base tower jammed</span><b>119.8<small>/120</small></b><p>homes served by Relief Grid. The dispatcher: <span class="hl">0</span>.</p></div>
+      <div><span class="tag">Full radio blackout</span><b>116.8<small>/120</small></b><p>with zero messages between vans. The dispatcher: <span class="hl">0</span>.</p></div>
+      <div><span class="tag">Safe mode, every scenario</span><b>0</b><p>homes served twice, in any of the 200 runs.</p></div>
+    </div>
+    <p class="note tag">With a clear radio the dispatcher gets there faster, and we say so. Relief Grid is for when it isn't working. Run it yourself: <a href="bench.html">bench.html</a> · <code>node sim/bench.js</code></p>
+  </section>
+</article>
+
 <!-- One printed sheet of hairline cells: masthead, two maps of the same flood, the trend, the controls. -->
-<div class="sheet">
+<div class="sheet" id="sim">
   <header class="mast">
     <h1 class="mark" id="mark">Relief Grid</h1>
     <p class="brief"><span class="tag">[Brief]</span> Six relief vans in a flooded city, the same flood twice. Left: no dispatcher, each van decides alone and shares what it knows by radio. Right: one central dispatcher on a radio tower.</p>
