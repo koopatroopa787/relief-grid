@@ -3,6 +3,10 @@
 Aid vans that keep delivering after a disaster takes the radios down, with no central dispatcher,
 and a guarantee that no household is served twice. Built at GreatUniHack 2026 for the Neptune North challenge.
 
+[![Relief Grid: 2-minute demo video](pitch/video-poster.jpg)](https://youtu.be/gYtxgIP4elE)
+
+**[Watch the 2-minute demo on YouTube](https://youtu.be/gYtxgIP4elE)** · [Google Drive copy](https://drive.google.com/file/d/15dHji0a7RJZlSkJChcY4BRaMA3YlqenP/view?usp=sharing)
+
 - The plan, interfaces and demo: [`PLAN.md`](PLAN.md)
 - Who is doing what: [`TASKS.md`](TASKS.md)
 - Proposals and questions: [`DISCUSSION.md`](DISCUSSION.md)
