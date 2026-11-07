@@ -22,13 +22,17 @@ for (let i = 0; i < triaged.length; i++) {
     continue;
   }
   let audio_b64 = null;
+  let tts_error = null;
   const item = tts[i];
   if (item && item.binary && item.binary.data) {
     try {
       audio_b64 = (await this.helpers.getBinaryDataBuffer(i, 'data')).toString('base64');
     } catch (err) {
-      audio_b64 = null; // reply still goes out as text
+      tts_error = String(err.message || err); // reply still goes out as text
     }
+  } else if (item && item.json && item.json.error) {
+    const e = item.json.error;
+    tts_error = String(e.message || e.description || JSON.stringify(e)).slice(0, 300);
   }
   const reply = {
     sos_id: p.sos.sos_id,
@@ -41,6 +45,7 @@ for (let i = 0; i < triaged.length; i++) {
     needs: p.triage.needs,
     urgency: p.triage.urgency,
     degraded: p.degraded,
+    tts_error, // why there is no audio, if there isn't (shown for debugging)
   };
   // Only cache complete answers. A degraded (fallback) or audio-less reply is still sent now,
   // but the SOS gets reprocessed next time, e.g. once an API key is fixed.

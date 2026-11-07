@@ -24,10 +24,18 @@ const codeNode = (name, file, mode, position) => ({
 const http = (name, params, position, extra = {}) => ({
   parameters: { ...params },
   name, type: 'n8n-nodes-base.httpRequest', typeVersion: 4.2, position,
+  // Retry transient failures (429 concurrency limits, 5xx), then continue so the webhook never hangs.
+  retryOnFail: true, maxTries: 3, waitBetweenTries: 1500,
   onError: 'continueRegularOutput', ...extra,
 });
 
 const fileResponse = timeout => ({ timeout, response: { response: { responseFormat: 'file', outputPropertyName: 'data' } } });
+// ElevenLabs limits concurrent requests per plan. The HTTP node's own batching only staggers request
+// starts (they still overlap), so the ElevenLabs calls sit inside a Loop Over Items, one SOS at a time.
+const loopNode = (name, position) => ({
+  parameters: { batchSize: 1, options: {} },
+  name, type: 'n8n-nodes-base.splitInBatches', typeVersion: 3, position,
+});
 
 const ifNode = (name, conditions, position) => ({
   parameters: {
@@ -55,10 +63,11 @@ const nodes = [
     { leftValue: '={{ $json.fresh.length }}', rightValue: 0, operator: { type: 'number', operation: 'gt' } },
   ], pos()),
   codeNode('One item per SOS', 'one_per_sos.js', 'all', pos(220, 200)),
+  loopNode('Each SOS: transcribe', pos(220, 200)),
   http('Fetch SOS audio', {
     url: '={{ $json.audio_url }}',
     options: fileResponse(15000),
-  }, pos(220, 200)),
+  }, pos(220, 200), { retryOnFail: false }),
   http('ElevenLabs Scribe: transcribe', {
     method: 'POST',
     url: `={{ ${CFG}.elevenBase }}/v1/speech-to-text`,
@@ -69,7 +78,7 @@ const nodes = [
       { parameterType: 'formBinaryData', name: 'file', inputDataFieldName: 'data' },
     ] },
     options: { timeout: 30000 },
-  }, pos(220, 200), { credentials: CRED_ELEVEN }),
+  }, pos(220, 200), { credentials: CRED_ELEVEN, retryOnFail: false }),
   codeNode('Pick transcript', 'pick_transcript.js', 'each', pos(220, 200)),
   http('Claude: translate, triage, reply', {
     method: 'POST',
@@ -85,6 +94,7 @@ const nodes = [
     options: { timeout: 60000 },
   }, pos(220, 200), { credentials: CRED_CLAUDE }),
   codeNode('Parse triage', 'parse_triage.js', 'each', pos(220, 200)),
+  loopNode('Each SOS: speak', pos(220, 200)),
   http('ElevenLabs: spoken reply', {
     method: 'POST',
     url: `={{ ${CFG}.elevenBase }}/v1/text-to-speech/{{ ${CFG}.voiceId }}?output_format=mp3_44100_64`,
@@ -104,32 +114,35 @@ nodes.push({
     responseBody: '={{ JSON.stringify($json.response) }}',
     options: { responseCode: '={{ $json.status }}' },
   },
-  name: 'Respond to sim', type: 'n8n-nodes-base.respondToWebhook', typeVersion: 1.1, position: [2860, 300],
+  name: 'Respond to sim', type: 'n8n-nodes-base.respondToWebhook', typeVersion: 1.1, position: [3300, 300],
 });
 nodes.push(ifNode('Urgent and Slack set?', [
   { leftValue: '={{ ($json.urgent || []).length }}', rightValue: 0, operator: { type: 'number', operation: 'gt' } },
   { leftValue: "={{ $json.slack || '' }}", rightValue: '', operator: { type: 'string', operation: 'notEmpty', singleValue: true } },
-], [3080, 300]));
+], [3520, 300]));
 nodes.push(http('Slack: urgent SOS alert', {
   method: 'POST',
   url: '={{ $json.slack }}',
   sendBody: true, specifyBody: 'json',
   jsonBody: "={{ JSON.stringify({ text: '🚨 Urgent SOS at HQ\\n' + $json.urgent.map(r => r.household + ': ' + r.english + (r.needs.length ? ' (needs: ' + r.needs.join(', ') + ')' : '')).join('\\n') }) }}",
   options: { timeout: 10000 },
-}, [3300, 200]));
+}, [3740, 200]));
 
 const link = (...names) => names.map(n => ({ node: n, type: 'main', index: 0 }));
 const connections = {
   'SOS batch in': { main: [link('Check cache')] },
   'Check cache': { main: [link('Anything new?')] },
   'Anything new?': { main: [link('One item per SOS'), link('Cached replies only')] },
-  'One item per SOS': { main: [link('Fetch SOS audio')] },
+  'One item per SOS': { main: [link('Each SOS: transcribe')] },
+  // Loop Over Items: output 0 = done (all items), output 1 = the next single item.
+  'Each SOS: transcribe': { main: [link('Pick transcript'), link('Fetch SOS audio')] },
   'Fetch SOS audio': { main: [link('ElevenLabs Scribe: transcribe')] },
-  'ElevenLabs Scribe: transcribe': { main: [link('Pick transcript')] },
+  'ElevenLabs Scribe: transcribe': { main: [link('Each SOS: transcribe')] },
   'Pick transcript': { main: [link('Claude: translate, triage, reply')] },
   'Claude: translate, triage, reply': { main: [link('Parse triage')] },
-  'Parse triage': { main: [link('ElevenLabs: spoken reply')] },
-  'ElevenLabs: spoken reply': { main: [link('Build replies')] },
+  'Parse triage': { main: [link('Each SOS: speak')] },
+  'Each SOS: speak': { main: [link('Build replies'), link('ElevenLabs: spoken reply')] },
+  'ElevenLabs: spoken reply': { main: [link('Each SOS: speak')] },
   'Build replies': { main: [link('Respond to sim')] },
   'Cached replies only': { main: [link('Respond to sim')] },
   'Respond to sim': { main: [link('Urgent and Slack set?')] },

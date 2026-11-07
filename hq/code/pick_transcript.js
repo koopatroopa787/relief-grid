@@ -2,7 +2,8 @@
 // Takes ElevenLabs Scribe's transcript, or falls back to the SOS's own text if there was no audio
 // or transcription failed. Builds the Claude request for the next node.
 
-const sos = $('One item per SOS').item.json;
+// By position, not item pairing: the transcribe loop keeps order but pairing through loops is fragile.
+const sos = $('One item per SOS').all()[$itemIndex].json;
 const cfg = $('Check cache').first().json.cfg;
 const stt = $json || {};
 

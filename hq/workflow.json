@@ -82,6 +82,20 @@
     {
       "id": "rg-node-05",
       "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "name": "Each SOS: transcribe",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "id": "rg-node-06",
+      "parameters": {
         "url": "={{ $json.audio_url }}",
         "options": {
           "timeout": 15000,
@@ -97,13 +111,16 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        880,
+        1100,
         200
       ],
+      "retryOnFail": false,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
       "onError": "continueRegularOutput"
     },
     {
-      "id": "rg-node-06",
+      "id": "rg-node-07",
       "parameters": {
         "method": "POST",
         "url": "={{ $('Check cache').first().json.cfg.elevenBase }}/v1/speech-to-text",
@@ -132,9 +149,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
+        1320,
         200
       ],
+      "retryOnFail": false,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
       "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
@@ -144,21 +164,21 @@
       }
     },
     {
-      "id": "rg-node-07",
+      "id": "rg-node-08",
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// n8n Code node \"Pick transcript\" (Run Once for Each Item)\n// Takes ElevenLabs Scribe's transcript, or falls back to the SOS's own text if there was no audio\n// or transcription failed. Builds the Claude request for the next node.\n\nconst sos = $('One item per SOS').item.json;\nconst cfg = $('Check cache').first().json.cfg;\nconst stt = $json || {};\n\nconst sttText = typeof stt.text === 'string' ? stt.text.trim() : '';\nconst transcript = sttText || (sos.text || '').trim();\nconst lang = stt.language_code || sos.lang || 'en';\nconst ok = transcript.length > 0;\nconst sttError = stt.error ? String(stt.error.message || stt.error) : null;\n\nconst system = [\n  'You triage voice SOS messages for a flood-relief operation whose radios and phones are down.',\n  \"Each message was recorded on an aid van's device when the van delivered rations to a household,\",\n  'and carried back to HQ. The transcript may be in any language. Return:',\n  '- english: a faithful English translation.',\n  '- needs: short list of concrete needs, e.g. \"insulin\", \"baby formula\", \"drinking water\". Empty if none.',\n  '- urgency: 3 if life-threatening or medical (medication, injury, infant, pregnant, elderly person alone),',\n  '  2 if important but not life-threatening, 1 otherwise.',\n  '- people: number of people mentioned, or 0 if unknown.',\n  '- reply: a short spoken reply to the household in the language of the transcript, at most two sentences,',\n  '  warm and plain. Confirm what HQ understood and that it will go out with the next van.',\n  '  Never promise a specific time, van or item.',\n  '- reply_lang: ISO 639-1 code of the reply language.',\n].join('\\n');\n\nconst schema = {\n  type: 'object',\n  properties: {\n    english: { type: 'string' },\n    needs: { type: 'array', items: { type: 'string' } },\n    urgency: { type: 'integer' },\n    people: { type: 'integer' },\n    reply: { type: 'string' },\n    reply_lang: { type: 'string' },\n  },\n  required: ['english', 'needs', 'urgency', 'people', 'reply', 'reply_lang'],\n  additionalProperties: false,\n};\n\nconst claudeRequest = {\n  model: cfg.claudeModel,\n  max_tokens: 4000,\n  fallbacks: 'default',\n  output_config: { effort: cfg.claudeEffort, format: { type: 'json_schema', schema } },\n  system,\n  messages: [{\n    role: 'user',\n    content: `Household: ${sos.household}\\nLanguage detected by speech recognition: ${lang}\\nTranscript:\\n\"\"\"\\n${transcript}\\n\"\"\"`,\n  }],\n};\n\nreturn { json: { sos, transcript, lang, ok, sttError, claudeRequest } };\n"
+        "jsCode": "// n8n Code node \"Pick transcript\" (Run Once for Each Item)\n// Takes ElevenLabs Scribe's transcript, or falls back to the SOS's own text if there was no audio\n// or transcription failed. Builds the Claude request for the next node.\n\n// By position, not item pairing: the transcribe loop keeps order but pairing through loops is fragile.\nconst sos = $('One item per SOS').all()[$itemIndex].json;\nconst cfg = $('Check cache').first().json.cfg;\nconst stt = $json || {};\n\nconst sttText = typeof stt.text === 'string' ? stt.text.trim() : '';\nconst transcript = sttText || (sos.text || '').trim();\nconst lang = stt.language_code || sos.lang || 'en';\nconst ok = transcript.length > 0;\nconst sttError = stt.error ? String(stt.error.message || stt.error) : null;\n\nconst system = [\n  'You triage voice SOS messages for a flood-relief operation whose radios and phones are down.',\n  \"Each message was recorded on an aid van's device when the van delivered rations to a household,\",\n  'and carried back to HQ. The transcript may be in any language. Return:',\n  '- english: a faithful English translation.',\n  '- needs: short list of concrete needs, e.g. \"insulin\", \"baby formula\", \"drinking water\". Empty if none.',\n  '- urgency: 3 if life-threatening or medical (medication, injury, infant, pregnant, elderly person alone),',\n  '  2 if important but not life-threatening, 1 otherwise.',\n  '- people: number of people mentioned, or 0 if unknown.',\n  '- reply: a short spoken reply to the household in the language of the transcript, at most two sentences,',\n  '  warm and plain. Confirm what HQ understood and that it will go out with the next van.',\n  '  Never promise a specific time, van or item.',\n  '- reply_lang: ISO 639-1 code of the reply language.',\n].join('\\n');\n\nconst schema = {\n  type: 'object',\n  properties: {\n    english: { type: 'string' },\n    needs: { type: 'array', items: { type: 'string' } },\n    urgency: { type: 'integer' },\n    people: { type: 'integer' },\n    reply: { type: 'string' },\n    reply_lang: { type: 'string' },\n  },\n  required: ['english', 'needs', 'urgency', 'people', 'reply', 'reply_lang'],\n  additionalProperties: false,\n};\n\nconst claudeRequest = {\n  model: cfg.claudeModel,\n  max_tokens: 4000,\n  fallbacks: 'default',\n  output_config: { effort: cfg.claudeEffort, format: { type: 'json_schema', schema } },\n  system,\n  messages: [{\n    role: 'user',\n    content: `Household: ${sos.household}\\nLanguage detected by speech recognition: ${lang}\\nTranscript:\\n\"\"\"\\n${transcript}\\n\"\"\"`,\n  }],\n};\n\nreturn { json: { sos, transcript, lang, ok, sttError, claudeRequest } };\n"
       },
       "name": "Pick transcript",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1320,
+        1540,
         200
       ]
     },
     {
-      "id": "rg-node-08",
+      "id": "rg-node-09",
       "parameters": {
         "method": "POST",
         "url": "={{ $('Check cache').first().json.cfg.anthropicBase }}/v1/messages",
@@ -188,9 +208,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1540,
+        1760,
         200
       ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
       "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
@@ -200,7 +223,7 @@
       }
     },
     {
-      "id": "rg-node-09",
+      "id": "rg-node-10",
       "parameters": {
         "mode": "runOnceForEachItem",
         "jsCode": "// n8n Code node \"Parse triage\" (Run Once for Each Item)\n// Reads Claude's JSON answer. If Claude failed or declined, falls back to a fixed reply in the\n// household's language so the household still hears something (marked degraded).\n\nconst prev = $('Pick transcript').item.json;\nconst cfg = $('Check cache').first().json.cfg;\nconst res = $json || {};\n\nconst FALLBACK_REPLY = {\n  en: 'Your message reached HQ. Help will come with the next van.',\n  ar: 'وصلت رسالتك إلى المقر. ستصل المساعدة مع الشاحنة التالية.',\n  ur: 'آپ کا پیغام ہیڈکوارٹر تک پہنچ گیا ہے۔ اگلی وین کے ساتھ مدد پہنچے گی۔',\n};\n\nlet triage = null;\nlet claudeError = null;\nif (prev.ok) {\n  try {\n    if (res.error) throw new Error(String(res.error.message || JSON.stringify(res.error)));\n    if (res.stop_reason === 'refusal') throw new Error('Claude declined the request');\n    const textBlock = (res.content || []).find(b => b.type === 'text');\n    if (!textBlock) throw new Error('No text block in Claude response');\n    triage = JSON.parse(textBlock.text);\n  } catch (err) {\n    claudeError = String(err.message || err);\n  }\n}\n\nconst lang2 = String(prev.lang || 'en').slice(0, 2).toLowerCase();\nconst degraded = !triage;\nif (!triage) {\n  triage = {\n    english: prev.transcript,\n    needs: [],\n    urgency: 2,\n    people: 0,\n    reply: FALLBACK_REPLY[lang2] || FALLBACK_REPLY.en,\n    reply_lang: FALLBACK_REPLY[lang2] ? lang2 : 'en',\n  };\n}\n\nreturn {\n  json: {\n    sos: prev.sos,\n    ok: prev.ok,\n    transcript: prev.transcript,\n    lang: prev.lang,\n    triage,\n    degraded,\n    errors: { stt: prev.sttError, claude: claudeError },\n    ttsRequest: { text: triage.reply, model_id: cfg.ttsModel },\n  },\n};\n"
@@ -209,12 +232,26 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1760,
+        1980,
         200
       ]
     },
     {
-      "id": "rg-node-10",
+      "id": "rg-node-11",
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "name": "Each SOS: speak",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2200,
+        200
+      ]
+    },
+    {
+      "id": "rg-node-12",
       "parameters": {
         "method": "POST",
         "url": "={{ $('Check cache').first().json.cfg.elevenBase }}/v1/text-to-speech/{{ $('Check cache').first().json.cfg.voiceId }}?output_format=mp3_44100_64",
@@ -237,9 +274,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1980,
+        2420,
         200
       ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
       "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
@@ -249,20 +289,20 @@
       }
     },
     {
-      "id": "rg-node-11",
+      "id": "rg-node-13",
       "parameters": {
-        "jsCode": "// n8n Code node \"Build replies\" (Run Once for All Items)\n// Joins each triaged SOS with its spoken reply (base64 MP3), caches successful replies so a resent\n// SOS is answered without reprocessing, and builds the webhook response.\n// If any SOS could not be transcribed, answers 503 so the sim's hq_link keeps the batch and retries;\n// the ones that worked are cached, so the retry only redoes the failures.\n\nconst head = $('Check cache').first().json;\nconst triaged = $('Parse triage').all();\nconst tts = $input.all();\n\nconst store = $getWorkflowStaticData('global');\nstore.replies = store.replies || {};\n\nconst replies = [...head.cached];\nconst failed = [];\nconst urgent = [];\n\nfor (let i = 0; i < triaged.length; i++) {\n  const p = triaged[i].json;\n  if (!p.ok) {\n    failed.push({ sos_id: p.sos.sos_id, why: p.errors.stt || 'no audio and no text' });\n    continue;\n  }\n  let audio_b64 = null;\n  const item = tts[i];\n  if (item && item.binary && item.binary.data) {\n    try {\n      audio_b64 = (await this.helpers.getBinaryDataBuffer(i, 'data')).toString('base64');\n    } catch (err) {\n      audio_b64 = null; // reply still goes out as text\n    }\n  }\n  const reply = {\n    sos_id: p.sos.sos_id,\n    household: p.sos.household,\n    lang: p.triage.reply_lang || p.lang,\n    text: p.triage.reply,\n    audio_b64,\n    mime: 'audio/mpeg',\n    english: p.triage.english,\n    needs: p.triage.needs,\n    urgency: p.triage.urgency,\n    degraded: p.degraded,\n  };\n  // Only cache complete answers. A degraded (fallback) or audio-less reply is still sent now,\n  // but the SOS gets reprocessed next time, e.g. once an API key is fixed.\n  if (!reply.degraded && reply.audio_b64) store.replies[reply.sos_id] = reply;\n  replies.push(reply);\n  if (reply.urgency >= 3) urgent.push(reply);\n}\n\nconst status = failed.length ? 503 : 200;\nconst response = failed.length\n  ? { error: 'Some SOS notes could not be transcribed; resend the batch later.', failed, replies }\n  : { replies };\n\nreturn [{ json: { status, response, urgent, slack: head.cfg.slackWebhookUrl, van: head.van, t: head.t } }];\n"
+        "jsCode": "// n8n Code node \"Build replies\" (Run Once for All Items)\n// Joins each triaged SOS with its spoken reply (base64 MP3), caches successful replies so a resent\n// SOS is answered without reprocessing, and builds the webhook response.\n// If any SOS could not be transcribed, answers 503 so the sim's hq_link keeps the batch and retries;\n// the ones that worked are cached, so the retry only redoes the failures.\n\nconst head = $('Check cache').first().json;\nconst triaged = $('Parse triage').all();\nconst tts = $input.all();\n\nconst store = $getWorkflowStaticData('global');\nstore.replies = store.replies || {};\n\nconst replies = [...head.cached];\nconst failed = [];\nconst urgent = [];\n\nfor (let i = 0; i < triaged.length; i++) {\n  const p = triaged[i].json;\n  if (!p.ok) {\n    failed.push({ sos_id: p.sos.sos_id, why: p.errors.stt || 'no audio and no text' });\n    continue;\n  }\n  let audio_b64 = null;\n  let tts_error = null;\n  const item = tts[i];\n  if (item && item.binary && item.binary.data) {\n    try {\n      audio_b64 = (await this.helpers.getBinaryDataBuffer(i, 'data')).toString('base64');\n    } catch (err) {\n      tts_error = String(err.message || err); // reply still goes out as text\n    }\n  } else if (item && item.json && item.json.error) {\n    const e = item.json.error;\n    tts_error = String(e.message || e.description || JSON.stringify(e)).slice(0, 300);\n  }\n  const reply = {\n    sos_id: p.sos.sos_id,\n    household: p.sos.household,\n    lang: p.triage.reply_lang || p.lang,\n    text: p.triage.reply,\n    audio_b64,\n    mime: 'audio/mpeg',\n    english: p.triage.english,\n    needs: p.triage.needs,\n    urgency: p.triage.urgency,\n    degraded: p.degraded,\n    tts_error, // why there is no audio, if there isn't (shown for debugging)\n  };\n  // Only cache complete answers. A degraded (fallback) or audio-less reply is still sent now,\n  // but the SOS gets reprocessed next time, e.g. once an API key is fixed.\n  if (!reply.degraded && reply.audio_b64) store.replies[reply.sos_id] = reply;\n  replies.push(reply);\n  if (reply.urgency >= 3) urgent.push(reply);\n}\n\nconst status = failed.length ? 503 : 200;\nconst response = failed.length\n  ? { error: 'Some SOS notes could not be transcribed; resend the batch later.', failed, replies }\n  : { replies };\n\nreturn [{ json: { status, response, urgent, slack: head.cfg.slackWebhookUrl, van: head.van, t: head.t } }];\n"
       },
       "name": "Build replies",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2200,
+        2640,
         200
       ]
     },
     {
-      "id": "rg-node-12",
+      "id": "rg-node-14",
       "parameters": {
         "jsCode": "// n8n Code node \"Cached replies only\" (Run Once for All Items)\n// Every SOS in the batch was already answered: return the stored replies without calling any API.\n\nconst { cached } = $input.first().json;\nreturn [{ json: { status: 200, response: { replies: cached }, urgent: [], slack: '' } }];\n"
       },
@@ -275,7 +315,7 @@
       ]
     },
     {
-      "id": "rg-node-13",
+      "id": "rg-node-15",
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ JSON.stringify($json.response) }}",
@@ -287,12 +327,12 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        2860,
+        3300,
         300
       ]
     },
     {
-      "id": "rg-node-14",
+      "id": "rg-node-16",
       "parameters": {
         "conditions": {
           "options": {
@@ -329,12 +369,12 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        3080,
+        3520,
         300
       ]
     },
     {
-      "id": "rg-node-15",
+      "id": "rg-node-17",
       "parameters": {
         "method": "POST",
         "url": "={{ $json.slack }}",
@@ -349,9 +389,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3300,
+        3740,
         200
       ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
       "onError": "continueRegularOutput"
     }
   ],
@@ -400,6 +443,24 @@
       "main": [
         [
           {
+            "node": "Each SOS: transcribe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Each SOS: transcribe": {
+      "main": [
+        [
+          {
+            "node": "Pick transcript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Fetch SOS audio",
             "type": "main",
             "index": 0
@@ -422,7 +483,7 @@
       "main": [
         [
           {
-            "node": "Pick transcript",
+            "node": "Each SOS: transcribe",
             "type": "main",
             "index": 0
           }
@@ -455,6 +516,24 @@
       "main": [
         [
           {
+            "node": "Each SOS: speak",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Each SOS: speak": {
+      "main": [
+        [
+          {
+            "node": "Build replies",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "ElevenLabs: spoken reply",
             "type": "main",
             "index": 0
@@ -466,7 +545,7 @@
       "main": [
         [
           {
-            "node": "Build replies",
+            "node": "Each SOS: speak",
             "type": "main",
             "index": 0
           }

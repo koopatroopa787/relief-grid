@@ -8,13 +8,14 @@ SOS batch in (webhook POST /webhook/sos)
   → Check cache          already answered? (de-duplication across runs, FIXES F7)
   → Anything new? ──no──→ Cached replies only ─────────────────────────────┐
         │yes                                                                │
-  → One item per SOS → Fetch SOS audio (from the sim's web server)          │
-  → ElevenLabs Scribe: transcribe (any language)                            │
+  → One item per SOS → Each SOS: transcribe (loop, one at a time):         │
+        Fetch SOS audio (from the sim's web server)                         │
+        → ElevenLabs Scribe: transcribe (any language)                      │
   → Pick transcript (falls back to the SOS's text if there is no audio)     │
   → Claude: translate, triage, reply  (structured JSON: english, needs,     │
         urgency 1-3, people, reply in the household's language)             │
   → Parse triage (fixed fallback reply if Claude fails: "degraded")         │
-  → ElevenLabs: spoken reply (MP3)                                          │
+  → Each SOS: speak (loop, one at a time): ElevenLabs: spoken reply (MP3)  │
   → Build replies (base64 audio, cache, 503 if any SOS failed → sim retries)│
   → Respond to sim  ←───────────────────────────────────────────────────────┘
   → Urgent and Slack set? → Slack: urgent SOS alert
@@ -24,6 +25,10 @@ Every HTTP node is set to **continue on error**, so one failing service never ha
 no audio → use the text; Claude down → fixed reply in the right language; TTS down → text-only reply;
 transcription failed → `503`, the sim keeps the batch and retries, and the SOS notes that did work are cached.
 
+The ElevenLabs calls run inside *Loop Over Items* nodes, one SOS at a time, because the plan limits concurrent
+requests (429 "Try spacing your requests out"). The HTTP node's own batching option is not enough: it only staggers
+when requests start, so they still overlap. A reply without audio carries `tts_error` saying why.
+
 ## Where it runs today: kaakserver (Kanishk's server, over Tailscale)
 
 - n8n 2.46.6 in Docker, container `relief-grid-n8n`, data in the Docker volume `relief_grid_n8n_data`,
@@ -31,15 +36,17 @@ transcription failed → `503`, the sim keeps the batch and retries, and the SOS
 - Editor: http://100.85.160.126:5678 (first visit: create the owner account).
 - Webhook for the sim: `HQ_URL = http://100.85.160.126:5678` → POST `/webhook/sos`. The workflow is published (active).
 - CORS is open, so the sim page can call it from any laptop **that is on the Tailscale network**.
-- Credentials `ElevenLabs API key` and `Anthropic API key` already exist with the value `REPLACE_ME`:
-  open Credentials in the editor and paste the real keys. Until then every SOS gets a degraded or 503 answer.
+- Credentials `ElevenLabs API key` and `Anthropic API key` hold the real keys (pasted in the editor, never in the repo).
 - **Audio:** n8n fetches SOS clips from `simBase` in the *Check cache* node, so it must point at the laptop that
   serves the sim, by its Tailscale IP, e.g. `http://100.111.79.4:8000/`, and that laptop must serve on all
   interfaces: `cd sim && python -m http.server 8000 --bind 0.0.0.0`. Text-only SOS notes work without this.
 - Tested on the server against fake ElevenLabs/Anthropic APIs: Arabic voice SOS → transcript → triage (urgency 3,
   insulin) → Arabic spoken reply; resend answered from cache with no API calls; transcription down → 503 → retry
   → 200; missing audio → 503; bad body → 200 `{replies: []}`; CORS preflight OK; Slack alert on urgency 3;
-  `sim/hq_link.js` round trip OK. **Not yet tested with the real APIs.**
+  `sim/hq_link.js` round trip OK.
+- **Tested with the real APIs (7 Nov, 15:15):** a 4-SOS text batch (ar, ur, pl, en) → 200 in about 11 s, all four
+  with correct triage (insulin = urgency 3) and a spoken reply in the household's language, twice in a row.
+  A voice batch (Arabic and Polish recordings, no text) → Scribe transcribed both → triage → spoken replies, 200 in 12 s.
 
 ## Run it somewhere else (about 5 minutes)
 
