@@ -42,4 +42,4 @@ Status: `todo` → `doing` → `done`. Claim a task (set `doing`) and push befor
 
 | ID | Task | Status |
 |---|---|---|
-| P1 | 2-minute story, slides if any, 2-minute video, Devpost text with AI-use disclosure | doing (script + Devpost text in `pitch/`; video to record) |
+| P1 | 2-minute story, slides if any, 2-minute video, Devpost text with AI-use disclosure | doing (script, Devpost text and 2:07 video done; video to upload to YouTube and link on Devpost) |
