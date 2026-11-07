@@ -580,3 +580,36 @@ backdrop();
 await newSim();
 document.fonts.ready.then(() => render());
 requestAnimationFrame(frame);
+
+// ── Intro video: the poster plays the YouTube embed on click (offline it still links to the video). ──
+document.querySelector('.frame .poster')?.addEventListener('click', (e) => {
+  if (!navigator.onLine) return;
+  e.preventDefault();
+  const f = document.createElement('iframe');
+  f.src = 'https://www.youtube-nocookie.com/embed/gYtxgIP4elE?autoplay=1&rel=0';
+  f.title = 'Relief Grid: 2-minute demo';
+  f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+  e.currentTarget.replaceWith(f);
+});
+
+// ── Intro: sections rise in on scroll; the big figures count up once. ──
+{
+  document.querySelectorAll('.reveal').forEach((sec) =>
+    sec.querySelectorAll('.steps li, .figs > div, .try li, .frame').forEach((el, i) => el.style.setProperty('--n', i)));
+  const countUp = (el) => {
+    const to = +el.dataset.count, t0 = performance.now(), dur = 1100;
+    const tick = (now) => {
+      const k = Math.min(1, (now - t0) / dur), e = 1 - (1 - k) ** 3;
+      el.textContent = (to * e).toFixed(1);
+      if (k < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+  const io = new IntersectionObserver((entries) => entries.forEach((en) => {
+    if (!en.isIntersecting) return;
+    en.target.classList.add('in');
+    if (!still.matches) en.target.querySelectorAll('[data-count]').forEach(countUp);
+    io.unobserve(en.target);
+  }), { threshold: 0.2 });
+  document.querySelectorAll('.reveal').forEach((sec) => io.observe(sec));
+}

@@ -30,7 +30,7 @@
     </div>
   </section>
 
-  <section class="how" aria-labelledby="howTitle">
+  <section class="reveal how" aria-labelledby="howTitle">
     <h2 class="sec-title" id="howTitle"><span class="tag">[01]</span> How a van decides alone</h2>
     <ol class="steps">
       <li><span class="tag">01 · Ownership</span><b>Agree without talking</b><p>Every van hashes each home against the vans it knows are alive. They all pick the same owner, without sending a message, and a van only serves homes it owns.</p></li>
@@ -40,14 +40,28 @@
     </ol>
   </section>
 
-  <section class="proof" aria-labelledby="proofTitle">
+  <section class="reveal proof" aria-labelledby="proofTitle">
     <h2 class="sec-title" id="proofTitle"><span class="tag">[02]</span> 50 random cities, measured</h2>
     <div class="figs">
-      <div><span class="tag">Base tower jammed</span><b>119.8<small>/120</small></b><p>homes served by Relief Grid. The dispatcher: <span class="hl">0</span>.</p></div>
-      <div><span class="tag">Full radio blackout</span><b>116.8<small>/120</small></b><p>with zero messages between vans. The dispatcher: <span class="hl">0</span>.</p></div>
+      <div><span class="tag">Base tower jammed</span><b><span data-count="119.8">119.8</span><small>/120</small></b><p>homes served by Relief Grid. The dispatcher: <span class="hl">0</span>.</p></div>
+      <div><span class="tag">Full radio blackout</span><b><span data-count="116.8">116.8</span><small>/120</small></b><p>with zero messages between vans. The dispatcher: <span class="hl">0</span>.</p></div>
       <div><span class="tag">Safe mode, every scenario</span><b>0</b><p>homes served twice, in any of the 200 runs.</p></div>
     </div>
     <p class="note tag">With a clear radio the dispatcher gets there faster, and we say so. Relief Grid is for when it isn't working. Run it yourself: <a href="bench.html">bench.html</a> · <code>node sim/bench.js</code></p>
+  </section>
+
+  <section class="reveal watch" aria-labelledby="watchTitle">
+    <h2 class="sec-title" id="watchTitle"><span class="tag">[03]</span> Watch it in two minutes</h2>
+    <div class="watch-body">
+      <div class="frame"><a class="poster" href="https://youtu.be/gYtxgIP4elE" aria-label="Watch the demo on YouTube"><img src="video-poster.jpg" alt="" loading="lazy"></a></div>
+      <ol class="try">
+        <li><span class="tag">[Try 01]</span><b>Press Space</b><p>Both fleets start. With a clear radio the dispatcher is quicker.</p></li>
+        <li><span class="tag">[Try 02]</span><b>Jam the tower</b><p>Pick Jam (J) and drag over the base on either map. The dispatcher's vans stall. Ours don't.</p></li>
+        <li><span class="tag">[Try 03]</span><b>Black out, then Lifeline</b><p>Hit Blackout (B), then switch Safe to Lifeline and watch "served twice" start counting.</p></li>
+        <li><span class="tag">[Try 04]</span><b>Kill HQ</b><p>Open SOS and switch HQ off. Vans keep the notes; the backlog clears when it's back.</p></li>
+      </ol>
+    </div>
+    <a class="scroll-cue wide" href="#sim"><span class="tag">[Live]</span> Open the console <span aria-hidden="true">↓</span></a>
   </section>
 </article>
 

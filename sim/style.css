@@ -104,6 +104,28 @@ html { scroll-behavior: smooth; }
 .note a { color: var(--ink); }
 .note code { font: inherit; }
 .sheet { scroll-margin-top: 0; }
+.watch-body { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+.frame { aspect-ratio: 16 / 9; border-right: 1px solid var(--rule); background: var(--paper-2); }
+.frame { position: relative; }
+.frame iframe { position: relative; width: 100%; height: 100%; border: 0; display: block; }
+.poster, .poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.try { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-rows: 1fr; }
+.try li { padding: var(--space-4) var(--cell); display: grid; gap: var(--space-1); align-content: center; }
+.try li + li { border-top: 1px solid var(--rule); }
+.try b { font: 750 clamp(1.3rem, 1.8vw, 1.9rem)/1 var(--font-display); font-stretch: 62%; text-transform: uppercase; }
+.try p { font: 400 0.86rem/1.5 var(--font-data); color: var(--ink-2); }
+.scroll-cue.wide { justify-content: center; border-left: 0; border-top: 1px solid var(--rule); }
+/* Sections rise in as they scroll into view (ui.js adds .in). */
+.reveal .steps li, .reveal .figs > div, .reveal .try li, .reveal .frame { opacity: 0; transform: translateY(18px);
+  transition: opacity .7s var(--ease-out), transform .7s var(--ease-out); transition-delay: calc(var(--n, 0) * 90ms); }
+.reveal.in .steps li, .reveal.in .figs > div, .reveal.in .try li, .reveal.in .frame { opacity: 1; transform: none; }
+@media (max-width: 980px) {
+  .watch-body { grid-template-columns: minmax(0, 1fr); }
+  .frame { border-right: 0; border-bottom: 1px solid var(--rule); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal .steps li, .reveal .figs > div, .reveal .try li, .reveal .frame { opacity: 1; transform: none; transition: none; }
+}
 @media (max-width: 980px) {
   .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .steps li:nth-child(3) { border-left: 0; }
