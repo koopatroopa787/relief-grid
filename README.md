@@ -26,4 +26,5 @@ the replies. Sample SOS voices are generated with ElevenLabs text-to-speech, not
 
 ## Pitch
 
-Demo script, measured numbers and judge Q&A: [`pitch/script.md`](pitch/script.md). Devpost text: [`pitch/devpost.md`](pitch/devpost.md).
+Pitch video (2:07): https://youtu.be/gYtxgIP4elE, made from the real sim by
+[`pitch/video/make_video.py`](pitch/video/make_video.py). Demo script, measured numbers and judge Q&A: [`pitch/script.md`](pitch/script.md). Devpost text: [`pitch/devpost.md`](pitch/devpost.md).

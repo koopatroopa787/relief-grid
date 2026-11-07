@@ -3,6 +3,10 @@
 Paste each section into the matching Devpost field. Tracks to tick: **Neptune North**, **overall prize**,
 **Best use of ElevenLabs**, **Best use of n8n**.
 
+## Video demo link
+
+https://youtu.be/gYtxgIP4elE
+
 ## Tagline
 
 Aid vans that keep delivering when the radios go down, with no dispatcher and nobody served twice.
