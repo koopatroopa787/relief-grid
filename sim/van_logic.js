@@ -46,7 +46,7 @@ export function getOwner(householdId, activeVans) {
  */
 export function getEffectiveOwner(householdId, activeVans, overrides = {}) {
   const ov = overrides[householdId];
-  if (ov && ov.owner) {
+  if (ov && ov.owner && (!activeVans || activeVans.includes(ov.owner))) {
     return ov.owner;
   }
   return getOwner(householdId, activeVans);
@@ -307,33 +307,57 @@ export function stepVan(state, percept) {
     }
   }
 
+  // Sort candidate households deterministically by distance to this van
+  ownedUnserved.sort((a, b) => {
+    const da = manhattanDist(percept.pos, a);
+    const db = manhattanDist(percept.pos, b);
+    if (da !== db) return da - db;
+    return a.id.localeCompare(b.id);
+  });
+
   // 5. Handover negotiation (F3: Giver lets go first):
-  // If this van owns a household and a nearby peer is significantly closer with stock,
-  // this van sets overrides[h.id] = { owner: peer, version: v + 1 } locally BEFORE sending.
-  if (percept.stock > 0) {
+  // When two vans meet or pass in close proximity (<= 6 cells), hand over secondary households
+  // if the peer is significantly closer, the giver has surplus work, and peer has stock.
+  // Never give away the current primary target, never hand over if workload is already low (<= 2),
+  // and cap handover version per household to 1 to prevent endless ping-pong churn.
+  if (percept.stock > 0 && ownedUnserved.length >= 3) {
     for (const [peerId, peer] of Object.entries(nextState.peerInfo)) {
       if (peerId === nextState.vanId) continue;
-      // Peer must be recent (heard in last 3 ticks) and have stock
-      if (percept.t - peer.t <= 3 && peer.stock > 0) {
-        for (let i = 0; i < ownedUnserved.length; i++) {
-          const h = ownedUnserved[i];
-          const distToMe = manhattanDist(percept.pos, h);
-          const distToPeer = manhattanDist(peer.pos, h);
+      // Peer must be recent (heard in last 3 ticks) and close (meeting <= 6 cells)
+      if (percept.t - peer.t <= 3 && manhattanDist(percept.pos, peer.pos) <= 6) {
+        // Count unserved households currently owned by peer in our view
+        let peerOwnedCount = 0;
+        for (const h of seenHouseholds) {
+          if (!nextState.served[h.id] && h.needsAid !== false) {
+            if (getEffectiveOwner(h.id, activeVans, nextState.overrides) === peerId) {
+              peerOwnedCount++;
+            }
+          }
+        }
 
-          // If peer is closer by at least 4 cells, hand it over
-          if (distToPeer + 4 < distToMe) {
-            const currentVer = nextState.overrides[h.id]?.version || 0;
-            const newVer = currentVer + 1;
+        // Only offload if giver has more work than peer, and peer has stock capacity
+        if (ownedUnserved.length > peerOwnedCount && peer.stock > peerOwnedCount) {
+          // Never give away our primary destination (ownedUnserved[0])
+          for (let i = 1; i < ownedUnserved.length; i++) {
+            const h = ownedUnserved[i];
+            // Prevent thrashing: do not re-handover a household that was already handed over
+            if ((nextState.overrides[h.id]?.version || 0) >= 1) continue;
 
-            // Giver lets go first: update locally immediately
-            nextState.overrides[h.id] = {
-              owner: peerId,
-              version: newVer,
-            };
+            const distToMe = manhattanDist(percept.pos, h);
+            const distToPeer = manhattanDist(peer.pos, h);
 
-            // Remove from our candidate list
-            ownedUnserved.splice(i, 1);
-            break; // Hand over at most one per peer per tick
+            // Hand over if peer is closer by at least 4 cells
+            if (distToPeer + 4 < distToMe) {
+              const currentVer = nextState.overrides[h.id]?.version || 0;
+              nextState.overrides[h.id] = {
+                owner: peerId,
+                version: currentVer + 1,
+              };
+
+              // Giver lets go first: remove from our candidate list
+              ownedUnserved.splice(i, 1);
+              break; // Hand over at most one per peer per tick
+            }
           }
         }
       }

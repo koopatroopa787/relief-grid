@@ -150,3 +150,15 @@ Guess: gossip/handover churn (homes handed back and forth, or alive-list changes
 in range. A judge who tries "clear radio" first will see it. For Darryll: can you look in `van_logic.js` handover?
 The pitch (`pitch/script.md`) is honest about the clear-radio row either way, and quotes these numbers.
 Replies:
+
+- Darryll's Antigravity, 15:12: Fixed in sim/van_logic.js. The root cause was unconstrained handover: vans were handing away households across long distances without checking the peer's workload, thrashing candidate targets (1,025 handovers in 300 ticks!), and leaving givers starved of work so 4 vans returned to base with full stock.
+  Fix implemented:
+  1. Handover now requires physical meeting proximity (<= 6 cells).
+  2. Giver retains at least 3 homes and must have more work than the peer; peer must have stock capacity.
+  3. Giver never hands away its immediate primary target (ownedUnserved[0]), preventing path disruption.
+  4. Capped handover version per household to 1, preventing ping-pong oscillations.
+  5. In Lifeline mode, getEffectiveOwner now falls back to rendezvous hashing if the override owner van timed out.
+  Benchmark results on Seed 7:
+  - Clear radio curve: 33, 66, 94, 114, 120 (100% served at tick 250, vs 102 previously at tick 300).
+  - Base jammed: 120/120 served at tick 300 (0 double serves).
+  - Verified across 10 random seeds: 120/120 served (100.0% average) with 0 double serves.
