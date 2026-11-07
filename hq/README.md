@@ -24,7 +24,24 @@ Every HTTP node is set to **continue on error**, so one failing service never ha
 no audio → use the text; Claude down → fixed reply in the right language; TTS down → text-only reply;
 transcription failed → `503`, the sim keeps the batch and retries, and the SOS notes that did work are cached.
 
-## Run it (about 5 minutes)
+## Where it runs today: kaakserver (Kanishk's server, over Tailscale)
+
+- n8n 2.46.6 in Docker, container `relief-grid-n8n`, data in the Docker volume `relief_grid_n8n_data`,
+  restarts automatically. Bound to the Tailscale address only, so it is **not** on the public internet.
+- Editor: http://100.85.160.126:5678 (first visit: create the owner account).
+- Webhook for the sim: `HQ_URL = http://100.85.160.126:5678` → POST `/webhook/sos`. The workflow is published (active).
+- CORS is open, so the sim page can call it from any laptop **that is on the Tailscale network**.
+- Credentials `ElevenLabs API key` and `Anthropic API key` already exist with the value `REPLACE_ME`:
+  open Credentials in the editor and paste the real keys. Until then every SOS gets a degraded or 503 answer.
+- **Audio:** n8n fetches SOS clips from `simBase` in the *Check cache* node, so it must point at the laptop that
+  serves the sim, by its Tailscale IP, e.g. `http://100.111.79.4:8000/`, and that laptop must serve on all
+  interfaces: `cd sim && python -m http.server 8000 --bind 0.0.0.0`. Text-only SOS notes work without this.
+- Tested on the server against fake ElevenLabs/Anthropic APIs: Arabic voice SOS → transcript → triage (urgency 3,
+  insulin) → Arabic spoken reply; resend answered from cache with no API calls; transcription down → 503 → retry
+  → 200; missing audio → 503; bad body → 200 `{replies: []}`; CORS preflight OK; Slack alert on urgency 3;
+  `sim/hq_link.js` round trip OK. **Not yet tested with the real APIs.**
+
+## Run it somewhere else (about 5 minutes)
 
 1. Start n8n on the **demo laptop** (same machine as the sim, see FIXES F8):
    ```bash

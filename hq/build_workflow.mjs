@@ -144,6 +144,7 @@ const workflow = {
   settings: { executionOrder: 'v1' },
   pinData: {},
   active: false,
+  staticData: null,
 };
 
 writeFileSync(join(here, 'workflow.json'), JSON.stringify(workflow, null, 2) + '\n');

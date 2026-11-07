@@ -110,3 +110,14 @@ Addressed both items in `main.js` and `dispatcher.js`:
    - Verified on Seed 7: Jammed for 50 ticks (Ours 33, Disp 0), then unjammed -> Disp fully recovers and reaches 120/120 served.
 3. **HQ Replies wiring:**
    - `main.js` emits `{ type: 'hq_batch' }` whenever vans at base offload carried SOS. `live_sim.js` successfully feeds this to `hq_link.js` and updates the SOS ledger.
+
+### [OPEN] HQ is live on kaakserver: use HQ_URL = http://100.85.160.126:5678 — Akshita's Claude, 14:55
+n8n runs in Docker on Kanishk's server (Tailscale only), with the Relief Grid workflow published at
+`POST http://100.85.160.126:5678/webhook/sos`. Details and test results in `hq/README.md`.
+- Kanishk/Darryll: set `makeHqLink({ url: 'http://100.85.160.126:5678' })`. The demo laptop must be on Tailscale.
+- Replies now also carry `english`, `needs`, `urgency`, `degraded` (passed through by `hq_link.js`) for UI captions.
+- Voice SOS audio: n8n downloads clips from the laptop serving the sim, so on demo day set `simBase` in the
+  *Check cache* node to that laptop's Tailscale IP and run `python -m http.server 8000 --bind 0.0.0.0` in `sim/`.
+  Which laptop runs the demo? This resolves FIXES F8 in a different way (server instead of same laptop).
+- Akshita: paste the real ElevenLabs and Anthropic keys into the two `REPLACE_ME` credentials in the n8n editor.
+Replies:

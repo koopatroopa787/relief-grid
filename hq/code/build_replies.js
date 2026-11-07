@@ -42,7 +42,9 @@ for (let i = 0; i < triaged.length; i++) {
     urgency: p.triage.urgency,
     degraded: p.degraded,
   };
-  store.replies[reply.sos_id] = reply;
+  // Only cache complete answers. A degraded (fallback) or audio-less reply is still sent now,
+  // but the SOS gets reprocessed next time, e.g. once an API key is fixed.
+  if (!reply.degraded && reply.audio_b64) store.replies[reply.sos_id] = reply;
   replies.push(reply);
   if (reply.urgency >= 3) urgent.push(reply);
 }
