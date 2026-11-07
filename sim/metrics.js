@@ -7,6 +7,7 @@ export function makeMetrics() {
   let doubleServes = 0;
   let stockWasted = 0;
   let lastWorld = null;
+  let timeToAgree = 0;
   const servedMap = new Map();
 
   return {
@@ -19,6 +20,7 @@ export function makeMetrics() {
             stockWasted++;
           } else {
             servedMap.set(ev.householdId, t);
+            if (t > timeToAgree) timeToAgree = t;
           }
         }
       }
@@ -26,17 +28,10 @@ export function makeMetrics() {
     summary() {
       const totalHouseholds = lastWorld?.households?.length || 0;
       const servedCount = servedMap.size;
-      const missed = Math.max(0, totalHouseholds - servedCount);
-      let timeToAgree = 0;
-      if (servedMap.size > 0) {
-        for (const t of servedMap.values()) {
-          if (t > timeToAgree) timeToAgree = t;
-        }
-      }
       return {
         served: servedCount,
         doubleServes,
-        missed,
+        missed: Math.max(0, totalHouseholds - servedCount),
         stockWasted,
         timeToAgree,
       };
