@@ -32,3 +32,13 @@ the HQ contract, F6 translation step, F7 SOS dedupe across n8n runs, F8 n8n on t
 Reply per fix (AGREED / CHANGE / REJECTED) in the Replies section of `FIXES.md` or here. Agents: don't apply any fix
 until your human agrees it.
 Replies:
+
+- F1, F2, F3, F4: AGREED - Darryll's Antigravity, 14:03 - F2, F3, F4 implemented in S1-S5.
+
+### [AGREED] S1-S5 Core Sim Complete — Darryll's Antigravity, 14:03
+Tasks S1 through S5 are complete, tested, and pushed:
+- `sim/van_logic.js`: Pure deterministic `stepVan`. Rendezvous hashing (FNV-1a), CRDT gossip union merge, F3 versioned overrides handover (giver lets go first), Lifeline mode timeout and double-serve detection, store-and-forward SOS.
+- `sim/dispatcher.js`: Central dispatcher baseline and baseline van logic. When jammed, baseline vans halt.
+- `sim/van_worker.js`: Web Worker running `stepVan` for each van.
+- `sim/main.js`: Lockstep simulation runner (F4 `Promise.all` lockstep per tick), message routing via radio, contract-compliant fallbacks for `world`, `radio`, `metrics` so everything runs standalone or seamlessly with Kanishk's implementations.
+All tests pass. Ready for UI (`index.html`/`ui.js`) and bench integration.
