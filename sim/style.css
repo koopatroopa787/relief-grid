@@ -23,7 +23,7 @@
   --amber-lo:  oklch(58% 0.13 62);
   --amber-ink: oklch(23% 0.07 245);
   --served:    oklch(80% 0.12 165);
-  --danger:    oklch(68% 0.19 27);
+  --danger:    oklch(73% 0.17 27);
   --danger-lo: oklch(46% 0.15 27);
   --link:      oklch(88% 0.06 220);
   --focus:     oklch(86% 0.16 80);
@@ -176,14 +176,14 @@ h1, h2, h3 { margin: 0; font-style: normal; text-wrap: balance; }
 .btn:active, .btn[aria-checked="true"], .btn[aria-pressed="true"] { transform: translateY(2px); box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.05), var(--key-edge-down); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 .btn.wide { flex: none; width: 100%; }
-.btn.primary { background: var(--amber); color: var(--amber-ink); border-color: var(--amber-2); box-shadow: inset 0 1px 0 var(--amber-2), 0 3px 0 var(--amber-lo), 0 6px 16px -6px var(--amber); }
+.btn.primary { background: var(--amber); color: var(--amber-ink); border-color: var(--amber-2); box-shadow: inset 0 1px 0 var(--amber-2), 0 3px 0 var(--amber-lo); }
 .btn.primary svg { fill: currentColor; }
 .btn.primary:hover { background: var(--amber-2); }
-.btn.primary[aria-pressed="true"] { box-shadow: inset 0 1px 0 var(--amber-2), 0 1px 0 var(--amber-lo), 0 0 18px -4px var(--amber); }
+.btn.primary[aria-pressed="true"] { box-shadow: inset 0 1px 0 var(--amber-2), 0 1px 0 var(--amber-lo); }
 .btn.tool[aria-checked="true"] { color: var(--amber); border-color: var(--amber-lo); background: var(--panel); }
 .btn.danger { color: var(--danger); border-color: var(--danger-lo); }
 .btn.danger:hover { background: oklch(30% 0.08 20); }
-.btn.danger[aria-pressed="true"] { background: var(--danger); color: var(--ink); border-color: var(--danger); box-shadow: 0 1px 0 var(--danger-lo), 0 0 20px -4px var(--danger); }
+.btn.danger[aria-pressed="true"] { background: var(--danger); color: var(--ink); border-color: var(--danger); box-shadow: 0 1px 0 var(--danger-lo); }
 
 .field { display: flex; justify-content: space-between; color: var(--ink-2); font-size: 0.95rem; font-weight: 550; }
 .field output { font: 600 0.95rem var(--font-data); color: var(--ink); }
@@ -219,7 +219,7 @@ input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; border-radius
   box-shadow: var(--well);
   transition: background 160ms var(--ease-out);
 }
-.switch[aria-checked="true"]::before { background: var(--housing) radial-gradient(circle at 28px 50%, var(--served) 6px, transparent 7px); box-shadow: var(--well), 0 0 12px -2px var(--served); }
+.switch[aria-checked="true"]::before { background: var(--housing) radial-gradient(circle at 28px 50%, var(--served) 6px, transparent 7px); box-shadow: var(--well); }
 .switch[aria-checked="false"] span { color: var(--danger); }
 
 .sos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
@@ -242,7 +242,7 @@ input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; border-radius
 .legend li { display: flex; align-items: center; gap: var(--space-2); }
 .k { width: 14px; height: 14px; flex: none; display: inline-block; }
 /* Legend swatches are tiny blocks, matching the extruded marks on the map. */
-.k.van { width: 12px; height: 12px; border-radius: 3px; background: var(--amber); box-shadow: 0 2px 0 var(--amber-lo), 0 0 10px -1px var(--amber); }
+.k.van { width: 12px; height: 12px; border-radius: 3px; background: var(--amber); box-shadow: 0 2px 0 var(--amber-lo); }
 .k.home, .k.done, .k.twice { width: 10px; height: 10px; margin: 1px 2px 3px; border-radius: 2px; }
 .k.home { background: var(--land-hi); box-shadow: 0 2px 0 var(--ink-3); }
 .k.done { background: var(--served); box-shadow: 0 2px 0 oklch(55% 0.1 165); }
