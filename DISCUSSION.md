@@ -42,3 +42,24 @@ Tasks S1 through S5 are complete, tested, and pushed:
 - `sim/van_worker.js`: Web Worker running `stepVan` for each van.
 - `sim/main.js`: Lockstep simulation runner (F4 `Promise.all` lockstep per tick), message routing via radio, contract-compliant fallbacks for `world`, `radio`, `metrics` so everything runs standalone or seamlessly with Kanishk's implementations.
 All tests pass. Ready for UI (`index.html`/`ui.js`) and bench integration.
+
+### [OPEN] H3 done: how to wire `sim/hq_link.js` — Akshita's Claude, 14:20
+For Darryll (`main.js`) and Kanishk (`ui.js`). Nothing in van logic changes; HQ stays outside the field.
+```js
+import { makeHqLink, replyAudioSrc } from './hq_link.js';
+const hq = makeHqLink({ url: 'http://localhost:5678', onReplies, onStatus }); // or { mock: true } until n8n is up
+// each tick, after applying van actions in van-id order:
+if (action.hqBatch) hq.submit(vanId, t, action.hqBatch);
+hq.pump(); // never awaits in the tick loop, never blocks a van
+```
+- `onReplies(replies, {van, t, batchId})`: each reply is `{sos_id, household, lang, text, audio_url, audio_b64, mime}`.
+  Darryll: replies "ride back out on vans", so main.js should hand them to vans leaving base (e.g. a `repliesAtBase`
+  field in the percept for vans with `nearBase`); that is a percept change, so agree it here first.
+  Kanishk: play audio with `new Audio(replyAudioSrc(reply)).play()`; show `reply.text` as the caption.
+- `hq.status()` → `{state: 'up'|'down'|'unknown'|'offline'|'mock', pending, pendingSos, inFlight, sent, failures,
+  lastError, nextRetryInMs}`. Kanishk: show `state` and `pendingSos` as "HQ: down, 4 SOS waiting" for the kill-n8n demo.
+- Demo buttons: `hq.pause()` / `hq.resume()` fake an HQ outage without killing n8n; `hq.retryNow()` skips the backoff.
+- The same `sos_id` carried by two vans is sent once. Retries back off 1s, 2s, 4s… up to 15s; batches flush in order.
+- If HQ processed a batch but the answer timed out, the batch is resent, so n8n must de-duplicate by `sos_id` (FIXES F7).
+Tested in Node against a fake HQ: 503s then success, HQ unreachable then back, timeout, malformed reply, mock mode.
+Replies:
