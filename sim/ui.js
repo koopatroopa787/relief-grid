@@ -29,155 +29,222 @@ function flap(el) {
 }
 const flaps = Object.fromEntries(['flapT', 'oServed', 'oDouble', 'oIdle', 'dServed', 'dDouble', 'dIdle'].map((id) => [id, flap($(id))]));
 
-// ── Map rendering ───────────────────────────────────────────────
+// ── Map rendering: an isometric relief model, drawn in 2D canvas ─────
+// Land is terraced by height, the flood is a flat sheet below it, homes and vans are small extruded blocks.
+// ponytail: plain painter's order (row by row) is enough for a grid this size; no depth buffer.
 let colors;
 function readColors() {
-  colors = Object.fromEntries(['water', 'water-2', 'land', 'land-2', 'amber', 'amber-ink', 'served', 'danger', 'link', 'ink', 'ink-2', 'ink-3', 'night', 'rule'].map((k) => [k, css('--' + k)]));
+  colors = Object.fromEntries(['water', 'water-hi', 'land', 'land-hi', 'amber', 'amber-2', 'amber-lo', 'served', 'danger', 'danger-lo',
+    'link', 'ink', 'ink-2', 'ink-3', 'night', 'housing', 'shade', 'rule', 'panel-2'].map((k) => [k, css('--' + k)]));
 }
 
-function jamPattern(ctx) {
-  const p = document.createElement('canvas');
-  p.width = p.height = 8;
-  const g = p.getContext('2d');
-  g.strokeStyle = colors.danger; g.globalAlpha = 0.75; g.lineWidth = 1.6;
-  g.beginPath(); g.moveTo(-2, 10); g.lineTo(10, -2); g.moveTo(6, 10); g.lineTo(10, 6); g.moveTo(-2, 2); g.lineTo(2, -2); g.stroke();
-  return ctx.createPattern(p, 'repeat');
-}
+const STEPS = 9;      // terrace levels above the flood
+const SLAB = 2.2;     // depth of the model's base, in levels
 
 function makeBoard(canvas, sideKey) {
   const ctx = canvas.getContext('2d');
-  let terrain = null, cs = 1, pattern = null, sizeKey = '';
+  let terrain = null, sizeKey = '', P = null, lvl = null, hatch = null, glow = null;
+
+  // Grid corner (x, y) at level z -> canvas pixels.
+  const iso = (x, y, z) => [P.ox + (x - y) * P.tw / 2, P.oy + (x + y) * P.th / 2 - z * P.zs];
 
   function resize(world) {
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth, h = canvas.clientHeight;
-    const key = `${w}x${h}@${dpr}`;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const cw = canvas.clientWidth, ch = canvas.clientHeight;
+    const key = `${cw}x${ch}@${dpr}`;
     if (key === sizeKey) return;
     sizeKey = key;
-    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
-    cs = canvas.width / world.w;
+    canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
+    const W = canvas.width, H = canvas.height, n = world.w + world.h, pad = W * 0.03;
+    const tw = Math.min((W - 2 * pad) / (n / 2), (H - 2 * pad) / (n / 4 + 0.3 * (STEPS + SLAB + 3)));
+    const zs = tw * 0.3;
+    const mapW = (n * tw) / 2, mapH = (n * tw) / 4 + zs * (STEPS + SLAB + 3);
+    P = { tw, th: tw / 2, zs, dpr, ox: (W - mapW) / 2 + (world.h * tw) / 2, oy: (H - mapH) / 2 + zs * (STEPS + 3) };
+    lvl = new Float32Array(world.w * world.h);
+    for (let k = 0; k < lvl.length; k++) lvl[k] = world.water[k] ? 0 : 1 + Math.min(STEPS - 1, Math.floor((world.height[k] - 0.42) / 0.065));
     terrain = drawTerrain(world);
-    pattern = jamPattern(ctx);
+    hatch = jamPattern();
+    glow = { amber: glowSprite(colors.amber), served: glowSprite(colors.served) };
+  }
+
+  // Light pools are pre-drawn sprites: shadowBlur per frame is far too slow on a canvas this size.
+  function glowSprite(color) {
+    const r = Math.ceil(P.tw * 1.6), g = document.createElement('canvas');
+    g.width = g.height = r * 2;
+    const x = g.getContext('2d'), grad = x.createRadialGradient(r, r, 0, r, r, r);
+    grad.addColorStop(0, color); grad.addColorStop(1, 'transparent');
+    x.globalAlpha = 0.55; x.fillStyle = grad; x.fillRect(0, 0, r * 2, r * 2);
+    return g;
+  }
+  const lightAt = (sprite, x, y, k = 1) => { const r = (sprite.width / 2) * k; ctx.drawImage(sprite, x - r, y - r, r * 2, r * 2); };
+
+  const poly = (g, pts) => { g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); };
+  function shadeFill(g, pts, color, dark) {
+    poly(g, pts); g.fillStyle = color; g.fill();
+    if (dark > 0) { g.fillStyle = `rgb(0 0 0 / ${dark})`; g.fill(); }
+    if (dark < 0) { g.fillStyle = `rgb(255 255 255 / ${-dark})`; g.fill(); }
   }
 
   function drawTerrain(world) {
     const off = document.createElement('canvas');
     off.width = canvas.width; off.height = canvas.height;
     const g = off.getContext('2d');
-    for (let y = 0; y < world.h; y++) for (let x = 0; x < world.w; x++) {
-      const k = y * world.w + x, ht = world.height[k];
-      g.fillStyle = world.water[k] ? (ht < 0.3 ? colors.water : colors['water-2']) : (ht > 0.6 ? colors['land-2'] : colors.land);
-      g.fillRect(Math.floor(x * cs), Math.floor(y * cs), Math.ceil(cs), Math.ceil(cs));
+    const { w, h } = world;
+    const L = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? -SLAB : lvl[y * w + x]);
+
+    // Soft contact shadow under the whole model.
+    g.save();
+    g.shadowColor = colors.shade; g.shadowBlur = P.tw * 3; g.shadowOffsetY = P.tw * 1.2;
+    poly(g, [iso(0, 0, -SLAB), iso(w, 0, -SLAB), iso(w, h, -SLAB), iso(0, h, -SLAB)]);
+    g.fillStyle = colors.housing; g.fill();
+    g.restore();
+
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const k = y * w + x, z = lvl[k], wet = world.water[k];
+      const base = wet ? colors.water : colors.land;
+      // Right face (towards +x) and left face (towards +y), only where the neighbour is lower.
+      const zr = L(x + 1, y), zl = L(x, y + 1);
+      if (zr < z) shadeFill(g, [iso(x + 1, y, z), iso(x + 1, y + 1, z), iso(x + 1, y + 1, zr), iso(x + 1, y, zr)], base, wet ? 0.5 : 0.42);
+      if (zl < z) shadeFill(g, [iso(x, y + 1, z), iso(x + 1, y + 1, z), iso(x + 1, y + 1, zl), iso(x, y + 1, zl)], base, wet ? 0.35 : 0.24);
+      // Top: land lightens with height (hypsometric tint), water darkens with depth.
+      const lift = wet ? Math.min(0.55, (0.42 - world.height[k]) * 1.5) : -(0.03 + z * 0.042);
+      shadeFill(g, [iso(x, y, z), iso(x + 1, y, z), iso(x + 1, y + 1, z), iso(x, y + 1, z)], base, lift);
     }
-    // Flood line: a pale contour where water meets land.
-    g.strokeStyle = colors.link; g.globalAlpha = 0.22; g.lineWidth = Math.max(1, cs * 0.08);
-    g.beginPath();
-    for (let y = 0; y < world.h; y++) for (let x = 0; x < world.w; x++) {
-      const k = y * world.w + x;
-      if (!world.water[k]) continue;
-      if (x + 1 < world.w && !world.water[k + 1]) { g.moveTo((x + 1) * cs, y * cs); g.lineTo((x + 1) * cs, (y + 1) * cs); }
-      if (x > 0 && !world.water[k - 1]) { g.moveTo(x * cs, y * cs); g.lineTo(x * cs, (y + 1) * cs); }
-      if (y + 1 < world.h && !world.water[k + world.w]) { g.moveTo(x * cs, (y + 1) * cs); g.lineTo((x + 1) * cs, (y + 1) * cs); }
-      if (y > 0 && !world.water[k - world.w]) { g.moveTo(x * cs, y * cs); g.lineTo((x + 1) * cs, y * cs); }
+
+    // Contour ink: a hairline wherever the level changes, like a printed relief map.
+    g.lineWidth = Math.max(1, P.dpr * 0.75);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const k = y * w + x, z = lvl[k];
+      for (const [nx, ny, a, b] of [[x + 1, y, [x + 1, y], [x + 1, y + 1]], [x, y + 1, [x, y + 1], [x + 1, y + 1]]]) {
+        if (nx >= w || ny >= h || L(nx, ny) === z) continue;
+        const shore = !!world.water[k] !== !!world.water[ny * w + nx];
+        g.strokeStyle = shore ? colors['water-hi'] : colors['land-hi'];
+        g.globalAlpha = shore ? 0.6 : 0.13;
+        g.beginPath(); g.moveTo(...iso(...a, z)); g.lineTo(...iso(...b, z)); g.stroke();
+      }
     }
-    g.stroke();
-    // Faint survey grid every 4 cells.
-    g.globalAlpha = 0.06; g.strokeStyle = colors.ink; g.lineWidth = 1;
-    g.beginPath();
-    for (let x = 0; x <= world.w; x += 4) { g.moveTo(x * cs, 0); g.lineTo(x * cs, off.height); }
-    for (let y = 0; y <= world.h; y += 4) { g.moveTo(0, y * cs); g.lineTo(off.width, y * cs); }
-    g.stroke();
+    g.globalAlpha = 1;
     return off;
   }
 
-  const center = (p) => [(p.x + 0.5) * cs, (p.y + 0.5) * cs];
+  const zAt = (world, x, y) => lvl[Math.max(0, Math.min(world.h - 1, y | 0)) * world.w + Math.max(0, Math.min(world.w - 1, x | 0))];
+  // Centre of cell (x, y) standing on the terrain, raised by dz levels.
+  const at = (world, p, dz = 0) => iso(p.x + 0.5, p.y + 0.5, zAt(world, p.x, p.y) + dz);
 
-  function draw(sim, snap) {
+  // A small extruded block centred on a cell: sides first, then the lit top. Returns the top centre.
+  function block(world, p, half, height, color, edge) {
+    const z0 = zAt(world, p.x, p.y), z1 = z0 + height, cx = p.x + 0.5, cy = p.y + 0.5;
+    const a = [cx - half, cy - half], b = [cx + half, cy - half], c = [cx + half, cy + half], d = [cx - half, cy + half];
+    shadeFill(ctx, [iso(...b, z1), iso(...c, z1), iso(...c, z0), iso(...b, z0)], edge || color, 0.45);
+    shadeFill(ctx, [iso(...d, z1), iso(...c, z1), iso(...c, z0), iso(...d, z0)], edge || color, 0.25);
+    shadeFill(ctx, [iso(...a, z1), iso(...b, z1), iso(...c, z1), iso(...d, z1)], color, 0);
+    return iso(cx, cy, z1);
+  }
+
+  function jamPattern() {
+    const p = document.createElement('canvas');
+    const s = Math.round(6 * P.dpr);
+    p.width = p.height = s;
+    const g = p.getContext('2d');
+    g.strokeStyle = colors.danger; g.lineWidth = 1.2 * P.dpr;
+    g.beginPath(); g.moveTo(0, s); g.lineTo(s, 0); g.stroke();
+    return ctx.createPattern(p, 'repeat');
+  }
+
+  function draw(sim, snap, now = performance.now()) {
     const { world, radio } = sim;
     resize(world);
     const side = snap[sideKey];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(terrain, 0, 0);
 
-    // Jamming
-    ctx.fillStyle = pattern;
-    if (radio.blackout) {
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    } else {
-      for (let k = 0; k < radio.jammed.length; k++) if (radio.jammed[k]) {
-        const x = k % world.w, y = (k / world.w) | 0;
-        ctx.fillRect(x * cs, y * cs, cs + 0.5, cs + 0.5);
+    // Jamming: a red wash and hatching laid on the terrain.
+    if (radio.blackout || radio.jammed.some(Boolean)) {
+      for (const [style, alpha] of [[colors['danger-lo'], 0.45], [hatch, 0.9]]) {
+        ctx.fillStyle = style; ctx.globalAlpha = alpha;
+        for (let k = 0; k < radio.jammed.length; k++) {
+          if (!radio.blackout && !radio.jammed[k]) continue;
+          const x = k % world.w, y = (k / world.w) | 0, z = lvl[k] + 0.05;
+          poly(ctx, [iso(x, y, z), iso(x + 1, y, z), iso(x + 1, y + 1, z), iso(x, y + 1, z)]);
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Van intentions: a dotted line on the ground to the chosen home.
+    ctx.lineWidth = Math.max(1, P.dpr); ctx.strokeStyle = colors.amber; ctx.globalAlpha = 0.5;
+    ctx.setLineDash([2 * P.dpr, 3 * P.dpr]);
+    ctx.beginPath();
+    for (const v of side.vans) if (v.target) { ctx.moveTo(...at(world, v, 0.1)); ctx.lineTo(...at(world, v.target, 0.1)); }
+    ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+    // Everything that stands on the model, drawn back to front.
+    const things = [];
+    const sosHomes = sideKey === 'ours' ? new Set(snap.sos.filter((s) => s.state === 'waiting').map((s) => s.household)) : new Set();
+    world.households.forEach((h, i) => things.push({ d: h.x + h.y, kind: 'home', h, st: side.state[i] }));
+    for (const v of side.vans) things.push({ d: v.x + v.y + 0.5, kind: 'van', v });
+    things.push({ d: world.base.x + world.base.y + 0.25, kind: 'base' });
+    things.sort((a, b) => a.d - b.d);
+
+    const pulse = 0.55 + 0.45 * Math.sin(now / 320);
+    const tops = new Map();
+    for (const t of things) {
+      if (t.kind === 'home') {
+        const col = t.st === 0 ? colors['land-hi'] : t.st === 1 ? colors.served : colors.danger;
+        const [x, y] = block(world, t.h, 0.24, 1.3, col, t.st === 0 ? colors['ink-3'] : null);
+        if (sosHomes.has(t.h.id)) {
+          // A lantern on a pole: this home has a voice SOS waiting.
+          const up = P.zs * 3.2;
+          ctx.strokeStyle = colors.amber; ctx.lineWidth = Math.max(1, P.dpr * 0.9);
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - up); ctx.stroke();
+          lightAt(glow.amber, x, y - up, 0.55 + 0.3 * pulse);
+          ctx.fillStyle = colors['amber-2']; ctx.beginPath(); ctx.arc(x, y - up, Math.max(2, P.tw * 0.18), 0, 7); ctx.fill();
+        }
+      } else if (t.kind === 'base') {
+        // The depot, with a mast. On the dispatcher board the mast lamp is the tower: lit while it reaches a van.
+        const [x, y] = block(world, world.base, 0.46, 1.6, colors['panel-2'], colors.rule);
+        const up = P.zs * 6, live = sideKey === 'dispatcher' && side.links.length > 0;
+        ctx.strokeStyle = colors.ink; ctx.lineWidth = Math.max(1.2, P.dpr);
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - up); ctx.stroke();
+        if (live) lightAt(glow.served, x, y - up, 0.7 + 0.3 * pulse);
+        ctx.fillStyle = live ? colors.served : colors.ink; ctx.beginPath(); ctx.arc(x, y - up, Math.max(2.5, P.tw * 0.22), 0, 7); ctx.fill();
+      } else {
+        const v = t.v, idle = v.idle && v.stock > 0;
+        if (!idle) lightAt(glow.amber, ...at(world, v, 0.4), 0.9);
+        tops.set(v.id, block(world, v, 0.36, 1.8, idle ? colors.night : colors.amber, idle ? colors.amber : colors['amber-lo']));
       }
     }
 
-    // Radio links
-    ctx.save();
-    ctx.strokeStyle = colors.link; ctx.globalAlpha = 0.55; ctx.lineWidth = Math.max(1, cs * 0.09);
-    ctx.setLineDash([cs * 0.35, cs * 0.3]);
+    // Radio: arcs through the air between whoever can hear each other; the dashes travel.
+    ctx.strokeStyle = sideKey === 'ours' ? colors.link : colors['ink-2']; ctx.globalAlpha = 0.75;
+    ctx.lineWidth = Math.max(1, P.dpr * 1.1); ctx.setLineDash([3 * P.dpr, 3 * P.dpr]);
+    ctx.lineDashOffset = -now / 60;
     ctx.beginPath();
     for (const [ax, ay, bx, by] of side.links) {
-      ctx.moveTo((ax + 0.5) * cs, (ay + 0.5) * cs); ctx.lineTo((bx + 0.5) * cs, (by + 0.5) * cs);
+      const a = at(world, { x: ax, y: ay }, 1.8), b = at(world, { x: bx, y: by }, sideKey === 'ours' ? 1.8 : 7.6);
+      const lift = Math.hypot(b[0] - a[0], b[1] - a[1]) * 0.28;
+      ctx.moveTo(...a); ctx.quadraticCurveTo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 - lift, ...b);
     }
-    ctx.stroke();
-    ctx.restore();
+    ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
 
-    // Households
-    const sq = cs * 0.5;
-    const sosHomes = sideKey === 'ours' ? new Set(snap.sos.filter((s) => s.state === 'waiting').map((s) => s.household)) : new Set();
-    world.households.forEach((h, i) => {
-      const st = side.state[i];
-      const [cx, cy] = center(h);
-      ctx.fillStyle = st === 0 ? colors['ink-2'] : st === 1 ? colors.served : colors.danger;
-      ctx.globalAlpha = st === 0 ? 0.9 : 1;
-      ctx.fillRect(cx - sq / 2, cy - sq / 2, sq, sq);
-      if (st === 2) {
-        ctx.strokeStyle = colors.danger; ctx.lineWidth = Math.max(1, cs * 0.1);
-        ctx.strokeRect(cx - sq, cy - sq, sq * 2, sq * 2);
-      }
-      if (sosHomes.has(h.id)) {
-        ctx.strokeStyle = colors.amber; ctx.lineWidth = Math.max(1, cs * 0.1);
-        ctx.beginPath(); ctx.arc(cx, cy, sq * 1.15, 0, Math.PI * 2); ctx.stroke();
-      }
-    });
-    ctx.globalAlpha = 1;
-
-    // Base depot
-    const [bx, by] = center(world.base);
-    ctx.strokeStyle = colors.ink; ctx.lineWidth = Math.max(1.5, cs * 0.12);
-    ctx.beginPath(); ctx.arc(bx, by, cs * 0.8, 0, Math.PI * 2); ctx.moveTo(bx - cs * 0.5, by); ctx.lineTo(bx + cs * 0.5, by); ctx.moveTo(bx, by - cs * 0.5); ctx.lineTo(bx, by + cs * 0.5); ctx.stroke();
-
-    // Vans: a faint line to where each one has decided to go, then the van itself.
-    ctx.lineWidth = Math.max(1, cs * 0.08);
-    for (const v of side.vans) {
-      const [vx, vy] = center(v);
-      if (v.target) {
-        const [tx, ty] = center(v.target);
-        ctx.strokeStyle = colors.amber; ctx.globalAlpha = 0.35;
-        ctx.beginPath(); ctx.moveTo(vx, vy); ctx.lineTo(tx, ty); ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
-    }
-    const r = cs * 0.62;
-    ctx.font = `600 ${Math.max(10, cs * 0.9)}px ${css('--font-data')}`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    for (const v of side.vans) {
-      const [vx, vy] = center(v);
-      ctx.beginPath(); ctx.arc(vx, vy, r, 0, Math.PI * 2);
-      if (v.idle && v.stock > 0) {
-        ctx.fillStyle = colors.night; ctx.fill();
-        ctx.strokeStyle = colors.amber; ctx.lineWidth = Math.max(1.5, cs * 0.14); ctx.globalAlpha = 0.7; ctx.stroke(); ctx.globalAlpha = 1;
-      } else {
-        ctx.fillStyle = colors.amber; ctx.fill();
-        ctx.strokeStyle = colors.night; ctx.lineWidth = Math.max(1.5, cs * 0.14); ctx.stroke();
-      }
-      ctx.fillStyle = colors.ink;
-      ctx.fillText(v.id, vx, vy - r - cs * 0.15);
-    }
+    // Van labels last, so nothing covers them.
+    ctx.font = `600 ${Math.max(10 * P.dpr, P.tw * 0.75)}px ${css('--font-data')}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = colors.ink;
+    for (const v of side.vans) { const [x, y] = tops.get(v.id); ctx.fillText(v.id, x, y - P.zs); }
   }
 
+  // Inverse projection: pointer -> grid cell, refined for the terrain height under it.
   function cellAt(e, world) {
-    const rect = canvas.getBoundingClientRect();
-    return { x: Math.floor(((e.clientX - rect.left) / rect.width) * world.w), y: Math.floor(((e.clientY - rect.top) / rect.height) * world.h) };
+    const r = canvas.getBoundingClientRect();
+    const sx = ((e.clientX - r.left) / r.width) * canvas.width, sy = ((e.clientY - r.top) / r.height) * canvas.height;
+    let c = { x: 0, y: 0 }, z = 0;
+    for (let i = 0; i < 3; i++) {
+      const u = (sx - P.ox) / (P.tw / 2), v = (sy - P.oy + z * P.zs) / (P.th / 2);
+      c = { x: Math.floor((u + v) / 2), y: Math.floor((v - u) / 2) };
+      z = zAt(world, c.x, c.y);
+    }
+    return c;
   }
 
   return { draw, cellAt, invalidate() { sizeKey = ''; } };
@@ -311,6 +378,8 @@ function frame(now) {
     acc = Math.min(acc + dt * BASE_TPS * speed, 4);
     if (!busy && acc >= 1) runTicks(Math.floor(acc));
   }
+  // Redraw every frame so the lanterns pulse and radio dashes travel, even when paused.
+  if (sim) boards.forEach((b) => b.draw(sim, sim.snapshot(), now));
   requestAnimationFrame(frame);
 }
 

@@ -85,8 +85,10 @@ export async function createSim({ seed = 7, mode = 'safe', loss = 0, useWorkers 
       v.target = res.state.currentAssignment;
       v.idle = !v.target;
     }
-    disp.links = dVans.filter((v) => dRadio.canLink(base, v, TOWER)).map((v) => [base.x, base.y, v.x, v.y]);
+    towerLinks();
   }
+  const towerLinks = () => { disp.links = dVans.filter((v) => dRadio.canLink(base, v, TOWER)).map((v) => [base.x, base.y, v.x, v.y]); };
+  towerLinks();
 
   function readOurs(events) {
     for (const e of events) {
