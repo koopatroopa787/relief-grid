@@ -1,0 +1,26 @@
+{
+  "request": {
+    "van": "V2",
+    "t": 412,
+    "batch": [
+      {
+        "sos_id": "S-H17-001",
+        "household": "H17",
+        "lang": "ar",
+        "audio": "samples/sos_h17_ar.mp3",
+        "text": null
+      }
+    ]
+  },
+  "response": {
+    "replies": [
+      {
+        "sos_id": "S-H17-001",
+        "household": "H17",
+        "lang": "ar",
+        "text": "Insulin is coming with van 3 within two hours.",
+        "audio_url": "samples/reply_h17_ar.mp3"
+      }
+    ]
+  }
+}
