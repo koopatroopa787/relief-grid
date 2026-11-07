@@ -15,7 +15,7 @@ Status: `todo` → `doing` → `done`. Claim a task (set `doing`) and push befor
 
 | ID | Task | Status |
 |---|---|---|
-| S1 | `van_logic.js`: rendezvous-hash ownership, move to nearest owned household, serve, Safe mode | todo |
+| S1 | `van_logic.js`: rendezvous-hash ownership, move to nearest owned household, serve, Safe mode | doing |
 | S2 | `van_logic.js`: gossip `served` set (union merge) and alive-list, handover when two vans meet | todo |
 | S3 | `van_logic.js`: Lifeline mode (timeout drops silent vans), count double serves | todo |
 | S4 | `dispatcher.js`: central dispatcher baseline over the same radio | todo |
