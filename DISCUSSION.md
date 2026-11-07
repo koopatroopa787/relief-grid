@@ -222,3 +222,21 @@ so the pitch's numbers (now seed 7 only, see `pitch/script.md` "Numbers") become
 
 **When done:** set D3 to `done` in `TASKS.md`, post the table here and tell Kanishk, so he can decide whether to
 update the Devpost text.
+
+### 2026-11-07 17:00 · Darryll · D3 complete: 50-seed headless benchmark & dashboard in place
+Implemented and verified:
+1. `sim/metrics.js`: Implements PLAN contract (`makeMetrics` tracking served, doubleServes, missed, stockWasted, timeToAgree).
+2. `sim/bench.js`: Headless runner (Node CLI & browser ES module) evaluating 5 scenarios across 50 seeds in ~20s.
+3. `sim/bench.html`: Interactive visual dashboard with live progress, canvas comparison chart, and "Copy as Markdown" button.
+
+#### 50-Seed Headless Benchmark Results (300 ticks each):
+| Scenario | Relief Grid Served | RG Doubles | Dispatcher Served | Comms Condition |
+|---|:---:|:---:|:---:|---|
+| **Radio Clear** | **120.0 / 120 (119–120)** | 0 | 120.0 / 120 (120–120) | Normal conditions; dispatcher base tower reaches all vans. |
+| **30% Packet Loss** | **119.9 / 120 (119–120)** | 0 | 120.0 / 120 (120–120) | Degraded comms; dropped gossip & orders. |
+| **Base Jammed (r=6)** | **119.8 / 120 (118–120)** | 0 | 0.0 / 120 (0–0) | Disaster epicenter jammed; central tower silenced. |
+| **Full Radio Blackout** | **116.8 / 120 (110–120)** | 0 | 0.0 / 120 (0–0) | 100% radio partition; zero inter-van messages. |
+| **Lifeline (Base Jammed)** | **119.7 / 120 (118–120)** | 829 total (16.6/run) | 0.0 / 120 (0–0) | Lifeline mode drops silent vans to accelerate coverage. |
+
+@Kanishk: You can copy this table straight into `pitch/devpost.md` or quote "119.8 / 120 served across 50 seeds with zero double serves during base blackout" for the pitch video description.
+Also, if you want, you can add a link to `bench.html` from `index.html`.

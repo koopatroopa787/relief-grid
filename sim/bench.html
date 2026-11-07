@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relief Grid · Headless 50-Seed Benchmark</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #0b0e14;
+    --card: #121722;
+    --border: #232d3f;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #2ea043;
+    --ours: #58a6ff;
+    --disp: #f85149;
+    --jam: #d29922;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-sans: 'Archivo', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 960px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+  .tagline { color: var(--muted); font-size: 0.95rem; margin-top: 4px; }
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    background: var(--border);
+    color: var(--ours);
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+  }
+
+  button {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+  }
+
+  button.primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  button.primary:hover:not(:disabled) { filter: brightness(1.15); }
+  button.secondary {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text);
+  }
+  button.secondary:hover:not(:disabled) { background: #1c2433; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .progress-wrap {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--ours);
+    transition: width 0.15s ease;
+  }
+  .progress-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .card-title {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  /* Table styles */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    font-family: var(--font-mono);
+  }
+  th, td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    color: var(--muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  td.center, th.center { text-align: center; }
+  td.bold { font-weight: 600; color: #fff; }
+  td.highlight { color: var(--ours); font-weight: 600; }
+  td.danger { color: var(--disp); font-weight: 600; }
+
+  /* Chart */
+  canvas#benchChart {
+    width: 100%;
+    height: 260px;
+    display: block;
+  }
+
+  .copy-btn {
+    font-size: 0.75rem;
+    padding: 5px 10px;
+  }
+
+  footer {
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-align: center;
+    padding: 16px 0;
+    font-family: var(--font-mono);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <div class="badge">Relief Grid · Evaluation</div>
+      <h1>Headless Multi-Seed Benchmark</h1>
+      <p class="tagline">50 seeds × 300 ticks: Relief Grid (Safe & Lifeline) vs. Central Dispatcher Baseline.</p>
+    </div>
+    <div>
+      <a href="index.html" style="color: var(--ours); text-decoration: none; font-family: var(--font-mono); font-size: 0.85rem;">← Back to Live Simulator</a>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button id="btnRun50" class="primary">Run 50-Seed Benchmark</button>
+    <button id="btnRun10" class="secondary">Run Quick (10 Seeds)</button>
+    <div class="progress-wrap">
+      <div class="progress-bar">
+        <div id="progressFill" class="progress-fill"></div>
+      </div>
+      <div id="progressText" class="progress-label">Ready. Click Run to begin headless benchmark.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Comparison Chart (Mean Homes Served / 120)</h2>
+      <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); display: flex; gap: 14px;">
+        <span><span style="color: var(--ours)">■</span> Relief Grid</span>
+        <span><span style="color: var(--disp)">■</span> Central Dispatcher</span>
+      </div>
+    </div>
+    <canvas id="benchChart" width="900" height="260"></canvas>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Summary Statistics</h2>
+      <button id="btnCopyMd" class="secondary copy-btn" disabled>Copy as Markdown</button>
+    </div>
+    <div style="overflow-x: auto;">
+      <table id="resultsTable">
+        <thead>
+          <tr>
+            <th>Scenario</th>
+            <th class="center">Relief Grid Served</th>
+            <th class="center">RG Doubles</th>
+            <th class="center">Dispatcher Served</th>
+            <th>Comms Condition</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr>
+            <td colspan="5" style="text-align: center; color: var(--muted); padding: 24px;">No runs yet. Click "Run 50-Seed Benchmark" to execute.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    Deterministic PRNG · Pure Van Logic (no global state) · Lockstep Web Workers / Async Execution
+  </footer>
+</div>
+
+<script type="module">
+import { runBenchmark, formatMarkdownTable, BENCH_SCENARIOS } from './bench.js';
+
+const btn50 = document.getElementById('btnRun50');
+const btn10 = document.getElementById('btnRun10');
+const btnCopy = document.getElementById('btnCopyMd');
+const progressFill = document.getElementById('progressFill');
+const progressText = document.getElementById('progressText');
+const tableBody = document.getElementById('tableBody');
+const canvas = document.getElementById('benchChart');
+const ctx = canvas.getContext('2d');
+
+let lastResults = null;
+
+function renderChart(results) {
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const paddingLeft = 140;
+  const paddingRight = 40;
+  const paddingTop = 20;
+  const paddingBottom = 40;
+  const chartW = w - paddingLeft - paddingRight;
+  const chartH = h - paddingTop - paddingBottom;
+
+  const n = results.length;
+  const groupHeight = chartH / n;
+  const barHeight = 12;
+
+  // Grid lines
+  ctx.strokeStyle = '#232d3f';
+  ctx.lineWidth = 1;
+  ctx.font = '11px "IBM Plex Mono", monospace';
+  ctx.fillStyle = '#8b949e';
+  ctx.textAlign = 'center';
+
+  for (let val = 0; val <= 120; val += 30) {
+    const x = paddingLeft + (val / 120) * chartW;
+    ctx.beginPath();
+    ctx.moveTo(x, paddingTop);
+    ctx.lineTo(x, h - paddingBottom);
+    ctx.stroke();
+    ctx.fillText(String(val), x, h - paddingBottom + 16);
+  }
+
+  results.forEach((r, idx) => {
+    const yCenter = paddingTop + idx * groupHeight + groupHeight / 2;
+
+    // Label
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = '12px "Archivo", sans-serif';
+    ctx.fillText(r.scenario.name, paddingLeft - 14, yCenter + 4);
+
+    // Relief Grid bar
+    const oVal = r.ours.servedMean;
+    const oW = (oVal / 120) * chartW;
+    const yOurs = yCenter - barHeight - 2;
+    ctx.fillStyle = '#58a6ff';
+    ctx.fillRect(paddingLeft, yOurs, Math.max(2, oW), barHeight);
+
+    // Dispatcher bar
+    const dVal = r.dispatcher.servedMean;
+    const dW = (dVal / 120) * chartW;
+    const yDisp = yCenter + 2;
+    ctx.fillStyle = dVal > 0 ? '#f85149' : '#484f58';
+    ctx.fillRect(paddingLeft, yDisp, Math.max(2, dW), barHeight);
+
+    // Value annotations
+    ctx.textAlign = 'left';
+    ctx.font = '10px "IBM Plex Mono", monospace';
+    ctx.fillStyle = '#58a6ff';
+    ctx.fillText(`${oVal.toFixed(1)}`, paddingLeft + oW + 6, yOurs + barHeight - 2);
+    ctx.fillStyle = dVal > 0 ? '#f85149' : '#8b949e';
+    ctx.fillText(`${dVal.toFixed(1)}`, paddingLeft + dW + 6, yDisp + barHeight - 2);
+  });
+}
+
+function updateTable(results) {
+  tableBody.innerHTML = '';
+  for (const r of results) {
+    const tr = document.createElement('tr');
+
+    const oStr = `${r.ours.servedMean.toFixed(1)} / 120 (${r.ours.servedMin}–${r.ours.servedMax})`;
+    const dStr = `${r.dispatcher.servedMean.toFixed(1)} / 120 (${r.dispatcher.servedMin}–${r.dispatcher.servedMax})`;
+    const oDbl = r.ours.totalDoubles > 0
+      ? `${r.ours.totalDoubles} total (${r.ours.doublesMean.toFixed(1)}/run)`
+      : '<span style="color: #2ea043">0</span>';
+
+    tr.innerHTML = `
+      <td class="bold">${r.scenario.name}</td>
+      <td class="center highlight">${oStr}</td>
+      <td class="center">${oDbl}</td>
+      <td class="center ${r.dispatcher.servedMean === 0 ? 'danger' : ''}">${dStr}</td>
+      <td style="color: var(--muted); font-size: 0.8rem;">${r.scenario.notes}</td>
+    `;
+    tableBody.appendChild(tr);
+  }
+}
+
+async function startBenchmark(seeds) {
+  btn50.disabled = true;
+  btn10.disabled = true;
+  btnCopy.disabled = true;
+
+  progressFill.style.width = '0%';
+  progressText.textContent = `Running ${seeds}-seed benchmark across ${BENCH_SCENARIOS.length} scenarios...`;
+
+  try {
+    const results = await runBenchmark({
+      seedCount: seeds,
+      onProgress: ({ scenario, seed, completedSteps, totalSteps, percent }) => {
+        progressFill.style.width = `${percent}%`;
+        progressText.textContent = `[${percent}%] ${scenario} (Seed ${seed}/${seeds})...`;
+      },
+    });
+
+    lastResults = results;
+    updateTable(results);
+    renderChart(results);
+
+    progressText.textContent = `Completed ${seeds} seeds in all scenarios! Ready to copy.`;
+    btnCopy.disabled = false;
+  } catch (err) {
+    console.error(err);
+    progressText.textContent = `Error: ${err.message}`;
+  } finally {
+    btn50.disabled = false;
+    btn10.disabled = false;
+  }
+}
+
+btn50.addEventListener('click', () => startBenchmark(50));
+btn10.addEventListener('click', () => startBenchmark(10));
+
+btnCopy.addEventListener('click', () => {
+  if (!lastResults) return;
+  const md = formatMarkdownTable(lastResults);
+  navigator.clipboard.writeText(md).then(() => {
+    const orig = btnCopy.textContent;
+    btnCopy.textContent = 'Copied to Clipboard!';
+    setTimeout(() => { btnCopy.textContent = orig; }, 2000);
+  });
+});
+</script>
+</body>
+</html>
