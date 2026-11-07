@@ -4,6 +4,7 @@
 // No global state, no Math.random. All deterministic.
 
 export const TIMEOUT = 60; // Ticks of silence before a van is considered timed out in Lifeline mode
+export const GOSSIP_INTERVAL = 3; // Broadcast gossip every 3 ticks
 
 /**
  * Deterministic 32-bit FNV-1a hash function.
@@ -50,10 +51,13 @@ export function initVanState({ vanId = 'V0', allVanIds = ['V0'], basePos = { x: 
     vanId,
     allVanIds: [...allVanIds],
     basePos: { ...basePos },
-    served: {},               // { [householdId]: tickServed }
-    vanHeartbeats: heartbeats, // { [vanId]: lastTickSeen }
+    served: {},               // { [householdId]: tickServed } - CRDT set of served households
+    vanHeartbeats: heartbeats, // { [vanId]: lastTickSeen } - alive list
+    peerInfo: {},             // { [vanId]: { pos: {x, y}, stock: number, t: number } }
+    delegatedAway: {},        // { [householdId]: recipientVanId } - handed over to peer closer
+    acceptedHandovers: {},    // { [householdId]: fromVanId } - accepted handover from peer
     carriedSos: [],           // array of { sos_id, household, lang, audio, text }
-    submittedSosIds: {},      // { [sos_id]: true }
+    submittedSosIds: {},      // { [sos_id]: true } - submitted to HQ
     deliveredReplies: {},     // { [sos_id]: true }
     doubleServesCount: 0,
   };
@@ -62,14 +66,14 @@ export function initVanState({ vanId = 'V0', allVanIds = ['V0'], basePos = { x: 
 /**
  * Manhattan distance between two positions.
  */
-function manhattanDist(a, b) {
+export function manhattanDist(a, b) {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
 /**
  * Step 1 grid cell closer from `from` to `to`.
  */
-function stepTowards(from, to) {
+export function stepTowards(from, to) {
   if (from.x === to.x && from.y === to.y) {
     return { x: from.x, y: from.y };
   }
@@ -115,6 +119,9 @@ export function stepVan(state, percept) {
     ...s,
     served: { ...s.served },
     vanHeartbeats: { ...s.vanHeartbeats },
+    peerInfo: { ...s.peerInfo },
+    delegatedAway: { ...s.delegatedAway },
+    acceptedHandovers: { ...s.acceptedHandovers },
     carriedSos: [...s.carriedSos],
     submittedSosIds: { ...s.submittedSosIds },
     deliveredReplies: { ...s.deliveredReplies },
@@ -132,29 +139,53 @@ export function stepVan(state, percept) {
     hqBatch: null,
   };
 
-  // 1. Process Inbox: CRDT gossip merge and heartbeat updates
+  const seenHouseholds = percept.seenHouseholds || [];
+  const householdMap = new Map();
+  for (const h of seenHouseholds) {
+    householdMap.set(h.id, h);
+  }
+
+  // 1. Process Inbox: CRDT gossip merge, heartbeats, handovers, and carried SOS
   const inbox = percept.inbox || [];
   for (const envelope of inbox) {
+    const sender = envelope.from;
     const msg = envelope.msg;
     if (!msg) continue;
 
     // Update heartbeat of sender
-    if (envelope.from) {
-      const prev = nextState.vanHeartbeats[envelope.from] || 0;
+    if (sender) {
+      const prev = nextState.vanHeartbeats[sender] || 0;
       if (percept.t > prev) {
-        nextState.vanHeartbeats[envelope.from] = percept.t;
+        nextState.vanHeartbeats[sender] = percept.t;
       }
     }
 
-    // Gossip message: merge served sets and heartbeats
+    // A. Gossip message: merge served sets and heartbeats
     if (msg.type === 'gossip') {
+      // Record sender's position & stock for handover decisions
+      if (sender && msg.pos) {
+        nextState.peerInfo[sender] = {
+          pos: { ...msg.pos },
+          stock: msg.stock ?? 0,
+          t: percept.t,
+        };
+      }
+
+      // CRDT Union merge of served households
       if (msg.served) {
         for (const [hId, tServed] of Object.entries(msg.served)) {
           if (!nextState.served[hId]) {
             nextState.served[hId] = tServed;
+          } else {
+            // Keep earliest served timestamp
+            if (tServed < nextState.served[hId]) {
+              nextState.served[hId] = tServed;
+            }
           }
         }
       }
+
+      // Merge van heartbeats (alive list)
       if (msg.heartbeats) {
         for (const [vId, tSeen] of Object.entries(msg.heartbeats)) {
           const cur = nextState.vanHeartbeats[vId] || 0;
@@ -163,12 +194,43 @@ export function stepVan(state, percept) {
           }
         }
       }
+
+      // Store-and-forward SOS gossip (DTN: duplicate carried SOS across vans in range)
+      if (Array.isArray(msg.carriedSos)) {
+        for (const remoteSos of msg.carriedSos) {
+          if (!nextState.submittedSosIds[remoteSos.sos_id] &&
+              !nextState.carriedSos.some(s => s.sos_id === remoteSos.sos_id)) {
+            nextState.carriedSos.push({ ...remoteSos });
+          }
+        }
+      }
+    }
+
+    // B. Handover Offer: Peer offers a household that is closer to us
+    if (msg.type === 'handover_offer' && msg.householdId) {
+      const h = householdMap.get(msg.householdId);
+      // Accept if we have stock, household is unserved, and we're not out of range
+      if (percept.stock > 0 && !nextState.served[msg.householdId] && h) {
+        nextState.acceptedHandovers[msg.householdId] = sender;
+        action.outbox.push({
+          to: sender,
+          msg: {
+            type: 'handover_ack',
+            from: nextState.vanId,
+            householdId: msg.householdId,
+          },
+        });
+      }
+    }
+
+    // C. Handover Ack: Peer confirmed acceptance of the household
+    if (msg.type === 'handover_ack' && msg.householdId) {
+      nextState.delegatedAway[msg.householdId] = sender;
     }
   }
 
-  // 2. Base operations: SOS delivery to HQ and stock replenishment
+  // 2. Base operations: SOS delivery to HQ
   if (percept.nearBase) {
-    // If we carry SOS that hasn't been submitted to HQ yet, submit the batch
     if (nextState.carriedSos.length > 0) {
       action.hqBatch = nextState.carriedSos.map(sos => ({ ...sos }));
       for (const sos of nextState.carriedSos) {
@@ -197,23 +259,53 @@ export function stepVan(state, percept) {
   }
 
   // 4. Candidate households
-  const seenHouseholds = percept.seenHouseholds || [];
   const ownedUnserved = [];
 
   for (const h of seenHouseholds) {
-    // Skip if already recorded as served
+    // Skip if already served
     if (nextState.served[h.id]) continue;
     // Skip if world reports no aid needed
     if (h.needsAid === false) continue;
 
-    // Check ownership via rendezvous hashing
-    const owner = getOwner(h.id, activeVans);
-    if (owner === nextState.vanId) {
+    // Check ownership or accepted handover
+    const naturalOwner = getOwner(h.id, activeVans);
+    const isNaturalOwner = (naturalOwner === nextState.vanId);
+    const wasDelegatedAway = !!nextState.delegatedAway[h.id];
+    const wasAccepted = !!nextState.acceptedHandovers[h.id];
+
+    if ((isNaturalOwner && !wasDelegatedAway) || wasAccepted) {
       ownedUnserved.push(h);
     }
   }
 
-  // 5. Check if currently at an owned unserved household to serve
+  // 5. Handover offers: Check if any owned household is significantly closer to a nearby peer
+  if (percept.stock > 0) {
+    for (const [peerId, peer] of Object.entries(nextState.peerInfo)) {
+      if (peerId === nextState.vanId) continue;
+      // Peer must be recent (within last 3 ticks) and have stock
+      if (percept.t - peer.t <= 3 && peer.stock > 0) {
+        for (const h of ownedUnserved) {
+          if (nextState.delegatedAway[h.id]) continue;
+          const distToMe = manhattanDist(percept.pos, h);
+          const distToPeer = manhattanDist(peer.pos, h);
+          // If peer is closer by at least 3 cells, offer handover
+          if (distToPeer + 3 < distToMe) {
+            action.outbox.push({
+              to: peerId,
+              msg: {
+                type: 'handover_offer',
+                from: nextState.vanId,
+                householdId: h.id,
+              },
+            });
+            break; // Offer at most one household per peer per tick to keep traffic small
+          }
+        }
+      }
+    }
+  }
+
+  // 6. Check if currently at an owned unserved household to serve
   const currentPos = percept.pos;
   const householdAtCurrentPos = ownedUnserved.find(
     h => h.x === currentPos.x && h.y === currentPos.y
@@ -239,10 +331,9 @@ export function stepVan(state, percept) {
       }
     }
 
-    // Serving takes this tick's primary action
     action.moveTo = null;
   } else {
-    // 6. Navigation / Movement
+    // 7. Navigation / Movement
     if (percept.stock <= 0) {
       // Out of stock: return to base
       if (!percept.nearBase) {
@@ -277,14 +368,16 @@ export function stepVan(state, percept) {
     }
   }
 
-  // 7. Periodic or opportunistic broadcast outbox (Gossip)
-  // Vans broadcast gossip every 5 ticks or whenever they have messages
-  if (percept.t % 5 === 0) {
+  // 8. Gossip outbox broadcast
+  if (percept.t % GOSSIP_INTERVAL === 0) {
     const gossipPayload = {
       type: 'gossip',
       from: nextState.vanId,
+      pos: percept.pos,
+      stock: percept.stock,
       served: nextState.served,
       heartbeats: nextState.vanHeartbeats,
+      carriedSos: nextState.carriedSos,
     };
     for (const vId of nextState.allVanIds) {
       if (vId !== nextState.vanId) {
