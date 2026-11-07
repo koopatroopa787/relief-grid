@@ -45,30 +45,46 @@ export function makeWorld(seed, { w = 48, h = 32, households = 120, vans = 6 } =
   const rng = mulberry32(seed);
   const height = heightField(w, h, rng);
   const water = new Uint8Array(w * h);
-  for (let k = 0; k < w * h; k++) water[k] = height[k] < 0.42 ? 1 : 0;
+  for (let k = 0; k < w * h; k++) water[k] = height[k] < 0.45 ? 1 : 0;
 
-  // Base on the highest ground in the left third, where an aid depot would sit.
-  let best = 0;
-  for (let y = 2; y < h - 2; y++) for (let x = 2; x < w / 3; x++) if (height[y * w + x] > height[best]) best = y * w + x;
+  // Street grid: avenues every 6 columns, streets every 5 rows, offset per seed. Flooded streets stay roads.
+  const ax = Math.floor(rng() * 6), sy = Math.floor(rng() * 5);
+  const road = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) road[y * w + x] = x % 6 === ax || y % 5 === sy ? 1 : 0;
+
+  // Base on the highest road cell in the left third, where an aid depot would sit.
+  let best = -1;
+  for (let y = 2; y < h - 2; y++) for (let x = 2; x < w / 3; x++) {
+    const k = y * w + x;
+    if (road[k] && (best < 0 || height[k] > height[best])) best = k;
+  }
   const base = { x: best % w, y: Math.floor(best / w) };
 
   const taken = new Set([best]);
   const hs = [];
   while (hs.length < households) {
     const x = Math.floor(rng() * w), y = Math.floor(rng() * h), k = y * w + x;
-    if (taken.has(k) || Math.abs(x - base.x) + Math.abs(y - base.y) < 3) continue;
+    if (taken.has(k) || road[k] || Math.abs(x - base.x) + Math.abs(y - base.y) < 3) continue;
     // Homes cluster on and near the flood edge, where help is needed.
     if (height[k] > 0.62 && rng() < 0.7) continue;
     taken.add(k);
     const id = `H${hs.length + 1}`;
     const lang = LANGS[Math.floor(rng() * LANGS.length)];
     const sos = rng() < 0.1 ? { sos_id: `S-${id}-001`, lang, audio: null, text: SOS_TEXT[lang] } : null;
-    hs.push({ id, x, y, people: 1 + Math.floor(rng() * 5), lang, sos, flooded: !!water[k], needsAid: true });
+    hs.push({ id, x, y, people: 1 + Math.floor(rng() * 5), lang, sos, flooded: !!water[k], needsAid: true, floors: 1 + Math.floor(rng() * 3) });
+  }
+
+  // The rest of the city: blocks that are not homes we track. Drawn only; vans ignore them.
+  const buildings = [];
+  for (let k = 0; k < w * h; k++) {
+    const x = k % w, y = Math.floor(k / w);
+    if (road[k] || taken.has(k) || water[k] || Math.abs(x - base.x) + Math.abs(y - base.y) < 2) continue;
+    if (rng() < 0.62) buildings.push({ x, y, floors: 1 + Math.floor(rng() * rng() * 6), lit: rng() });
   }
 
   const stock = Math.ceil(households / vans) + 4;
   const vs = Array.from({ length: vans }, (_, i) => ({ id: `V${i + 1}`, x: base.x, y: base.y, stock }));
-  return { seed, w, h, rng, base, households: hs, vans: vs, water, height };
+  return { seed, w, h, rng, base, households: hs, vans: vs, water, height, road, buildings };
 }
 
 // Self-check: same seed gives the same world.

@@ -6,7 +6,7 @@
 <title>Relief Grid</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,600;6..96,700&family=Hanken+Grotesk:wght@400..700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,114 +14,102 @@
   <symbol id="i-play" viewBox="0 0 20 20"><path d="M6 4.5v11l9-5.5z"/></symbol>
   <symbol id="i-pause" viewBox="0 0 20 20"><path d="M6 4.5v11M14 4.5v11"/></symbol>
   <symbol id="i-reset" viewBox="0 0 20 20"><path d="M4.5 10a5.5 5.5 0 1 0 1.6-3.9M4.5 3.5v3.2h3.2"/></symbol>
-  <symbol id="i-jam" viewBox="0 0 20 20"><path d="M10 3v14M5.5 6.5a6 6 0 0 0 0 7M14.5 6.5a6 6 0 0 1 0 7M3 3l14 14"/></symbol>
-  <symbol id="i-erase" viewBox="0 0 20 20"><path d="M8 16h8M4.5 12.5 11 6l4 4-5.5 5.5H7z"/></symbol>
-  <symbol id="i-blackout" viewBox="0 0 20 20"><path d="M10 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12zM5.8 5.8l8.4 8.4"/></symbol>
   <symbol id="i-voice" viewBox="0 0 20 20"><path d="M4 8v4h3l4 3V5L7 8zM14 7.5a3.5 3.5 0 0 1 0 5"/></symbol>
 </svg>
 
-<header class="bar">
-  <div class="brand">
-    <h1>Relief Grid</h1>
-    <p class="plate">Lower Irwell flood · night of 7 Nov · <span id="seedLabel">seed 7</span></p>
+<canvas id="bg" aria-hidden="true"></canvas>
+
+<!-- One printed sheet of hairline cells: masthead, two maps of the same flood, the trend, the controls. -->
+<div class="sheet">
+  <header class="mast">
+    <h1 class="mark" id="mark">Relief Grid</h1>
+    <p class="brief"><span class="tag">[Brief]</span> Six relief vans in a flooded city, the same flood twice. Left: no dispatcher, each van decides alone and shares what it knows by radio. Right: one central dispatcher on a radio tower.</p>
+    <dl class="meta">
+      <div><dt class="tag">[Scene]</dt><dd>Lower Irwell · <span id="seedLabel">seed 7</span></dd></div>
+      <div><dt class="tag">[Tick]</dt><dd><span class="flap" id="flapT" data-digits="4"></span></dd></div>
+      <div><dt class="tag">[Radio]</dt><dd class="radio-state" id="radioState" data-state="ok"><span class="dot" aria-hidden="true"></span><span id="radioText">Clear</span></dd></div>
+    </dl>
+  </header>
+
+  <main class="plate" aria-label="Side-by-side comparison">
+    <section class="board" data-side="ours">
+      <canvas id="mapOurs" aria-label="City map: our vans, each deciding alone"></canvas>
+      <header class="annot tl">
+        <p class="tag">[01] Relief Grid</p>
+        <h2>Vans decide alone</h2>
+        <p class="state" id="oursMode">Safe mode</p>
+      </header>
+      <p class="annot tr small-tally">
+        <span class="dbl"><span class="tag">Served twice</span> <span class="flap" id="oDouble" data-digits="3" data-pad=" "></span></span>
+        <span><span class="tag">Stalled</span> <span class="flap" id="oIdle" data-digits="1"></span>/6</span>
+      </p>
+      <p class="annot br tally"><span class="flap big" id="oServed" data-digits="3" data-pad=" "></span><span class="unit">/120<br>homes served</span></p>
+    </section>
+
+    <section class="board" data-side="dispatcher">
+      <canvas id="mapDisp" aria-label="City map: dispatcher vans, waiting for orders from the base tower"></canvas>
+      <header class="annot tl">
+        <p class="tag">[02] Baseline</p>
+        <h2>Dispatcher decides</h2>
+        <p class="state" id="dispState">Tower linked</p>
+      </header>
+      <p class="annot tr small-tally">
+        <span class="dbl"><span class="tag">Served twice</span> <span class="flap" id="dDouble" data-digits="3" data-pad=" "></span></span>
+        <span><span class="tag">Stalled</span> <span class="flap" id="dIdle" data-digits="1"></span>/6</span>
+      </p>
+      <p class="annot br tally"><span class="flap big" id="dServed" data-digits="3" data-pad=" "></span><span class="unit">/120<br>homes served</span></p>
+    </section>
+  </main>
+
+  <figure class="trend">
+    <figcaption><span class="tag">[03]</span> Homes served over time</figcaption>
+    <canvas id="trend" aria-label="Line chart of homes served over time, both systems"></canvas>
+    <ul class="legend" aria-label="Legend">
+      <li><i class="k line-ours"></i>Relief Grid</li>
+      <li><i class="k line-disp"></i>Dispatcher</li>
+      <li><i class="k van"></i>Van</li>
+      <li><i class="k home"></i>Waiting</li>
+      <li><i class="k done"></i>Served</li>
+      <li><i class="k twice"></i>Served twice</li>
+      <li><i class="k lamp"></i>Voice SOS</li>
+      <li><i class="k jam"></i>Jammed</li>
+    </ul>
+  </figure>
+
+  <nav class="strip" aria-label="Controls">
+    <div class="cell">
+      <span class="tag">[Run]</span>
+      <button class="key lead" id="btnPlay" aria-pressed="false"><svg><use href="#i-play"/></svg><span>Run</span><kbd>Space</kbd></button>
+      <button class="key" id="btnReset" aria-label="Reset"><svg><use href="#i-reset"/></svg><kbd>R</kbd></button>
+      <label class="slide" for="speed">Speed <input type="range" id="speed" min="1" max="4" step="1" value="2"><output id="speedOut">2×</output></label>
+    </div>
+    <div class="cell" role="radiogroup" aria-label="Brush: drag across either map">
+      <span class="tag">[Radio]</span>
+      <button class="key" id="toolJam" role="radio" aria-checked="true">Jam<kbd>J</kbd></button>
+      <button class="key" id="toolErase" role="radio" aria-checked="false">Unjam<kbd>E</kbd></button>
+      <button class="key danger" id="btnBlackout" aria-pressed="false"><span>Blackout</span><kbd>B</kbd></button>
+      <label class="slide" for="loss">Loss <input type="range" id="loss" min="0" max="100" step="5" value="0"><output id="lossOut">0%</output></label>
+    </div>
+    <div class="cell" role="radiogroup" aria-label="When a van goes silent">
+      <span class="tag">[Silent van]</span>
+      <button class="key" role="radio" aria-checked="true" id="modeSafe" title="Never serve twice; a silent van's homes wait">Safe</button>
+      <button class="key" role="radio" aria-checked="false" id="modeLife" title="Cover a silent van's homes; some may be served twice">Lifeline</button>
+    </div>
+    <div class="cell">
+      <span class="tag">[Voice]</span>
+      <button class="key" popovertarget="sosPanel"><svg><use href="#i-voice"/></svg>SOS <span class="count" id="sosCount">0</span></button>
+    </div>
+  </nav>
+</div>
+
+<section id="sosPanel" popover aria-label="Voice SOS notes">
+  <div class="head-row">
+    <h2><span class="tag">[Voice]</span> SOS notes</h2>
+    <button class="switch" id="hqSwitch" role="switch" aria-checked="true"><span>HQ online</span></button>
   </div>
-  <div class="clock" aria-live="off">
-    <span class="clock-label">Tick</span>
-    <span class="flap" id="flapT" data-digits="4"></span>
-  </div>
-  <div class="radio-state" id="radioState" data-state="ok">
-    <span class="dot" aria-hidden="true"></span><span id="radioText">Radio clear</span>
-  </div>
-</header>
-
-<main class="room">
-  <section class="boards" aria-label="Side-by-side comparison">
-    <figure class="board" data-side="ours">
-      <figcaption>
-        <h2>Relief Grid <span class="sub">no dispatcher</span></h2>
-        <span class="chip" id="oursMode">Safe mode</span>
-      </figcaption>
-      <div class="stage"><canvas id="mapOurs" aria-label="Map: our vans, each deciding alone"></canvas></div>
-      <dl class="readout">
-        <div><dt>Served</dt><dd><span class="flap" id="oServed" data-digits="3"></span><span class="of">/120</span></dd></div>
-        <div class="dbl"><dt>Served twice</dt><dd><span class="flap" id="oDouble" data-digits="3"></span></dd></div>
-        <div><dt>Vans stalled</dt><dd><span class="flap" id="oIdle" data-digits="1"></span><span class="of">/6</span></dd></div>
-      </dl>
-    </figure>
-
-    <figure class="board" data-side="dispatcher">
-      <figcaption>
-        <h2>Central dispatcher <span class="sub">baseline</span></h2>
-        <span class="chip quiet" id="dispState">Tower linked</span>
-      </figcaption>
-      <div class="stage"><canvas id="mapDisp" aria-label="Map: dispatcher vans, waiting for orders from the base tower"></canvas></div>
-      <dl class="readout">
-        <div><dt>Served</dt><dd><span class="flap" id="dServed" data-digits="3"></span><span class="of">/120</span></dd></div>
-        <div class="dbl"><dt>Served twice</dt><dd><span class="flap" id="dDouble" data-digits="3"></span></dd></div>
-        <div><dt>Vans stalled</dt><dd><span class="flap" id="dIdle" data-digits="1"></span><span class="of">/6</span></dd></div>
-      </dl>
-    </figure>
-
-    <figure class="trend">
-      <figcaption>
-        <h2>Households served over time</h2>
-        <span class="trend-key"><i class="k van"></i>Relief Grid <i class="k disp"></i>Dispatcher <i class="k twice"></i>Served twice</span>
-      </figcaption>
-      <div class="trend-stage"><canvas id="trend" aria-label="Line chart of households served over time, both systems"></canvas></div>
-    </figure>
-  </section>
-
-  <aside class="rail" aria-label="Controls">
-    <section class="group">
-      <h3>Run</h3>
-      <div class="row">
-        <button class="btn primary" id="btnPlay" aria-pressed="false"><svg><use href="#i-play"/></svg><span>Run</span></button>
-        <button class="btn" id="btnReset"><svg><use href="#i-reset"/></svg><span>Reset</span></button>
-      </div>
-      <label class="field" for="speed">Speed <output id="speedOut">2×</output></label>
-      <input type="range" id="speed" min="1" max="4" step="1" value="2">
-    </section>
-
-    <section class="group">
-      <h3>Break the radio</h3>
-      <div class="row tools" role="radiogroup" aria-label="Brush">
-        <button class="btn tool" id="toolJam" role="radio" aria-checked="true"><svg><use href="#i-jam"/></svg><span>Jam</span></button>
-        <button class="btn tool" id="toolErase" role="radio" aria-checked="false"><svg><use href="#i-erase"/></svg><span>Unjam</span></button>
-      </div>
-      <p class="hint">Drag across either map. Both maps share the same airwaves.</p>
-      <button class="btn danger wide" id="btnBlackout" aria-pressed="false"><svg><use href="#i-blackout"/></svg><span>Total blackout</span></button>
-      <label class="field" for="loss">Packet loss <output id="lossOut">0%</output></label>
-      <input type="range" id="loss" min="0" max="100" step="5" value="0">
-    </section>
-
-    <section class="group">
-      <h3>When a van goes silent</h3>
-      <div class="seg" role="radiogroup" aria-label="Mode">
-        <button role="radio" aria-checked="true" id="modeSafe">Safe<small>never serve twice</small></button>
-        <button role="radio" aria-checked="false" id="modeLife">Lifeline<small>cover its homes</small></button>
-      </div>
-    </section>
-
-    <section class="group grow">
-      <div class="head-row">
-        <h3>Voice SOS</h3>
-        <button class="switch" id="hqSwitch" role="switch" aria-checked="true"><span>HQ online</span></button>
-      </div>
-      <ol class="sos" id="sosList"></ol>
-    </section>
-
-    <section class="group legend" aria-label="Legend">
-      <ul>
-        <li><i class="k van"></i>Van</li>
-        <li><i class="k home"></i>Waiting</li>
-        <li><i class="k done"></i>Served</li>
-        <li><i class="k twice"></i>Served twice</li>
-        <li><i class="k link"></i>Radio link</li>
-        <li><i class="k jam"></i>Jammed</li>
-      </ul>
-    </section>
-  </aside>
-</main>
+  <p class="hint">Carried van to van, then to HQ for transcription and a spoken reply.</p>
+  <ol class="sos" id="sosList"></ol>
+</section>
 
 <script type="module" src="ui.js"></script>
 </body>
