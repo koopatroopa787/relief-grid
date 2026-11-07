@@ -1,5 +1,25 @@
 # HQ: the n8n workflow (H1)
 
+## Quick access (everything the team needs)
+
+| What | Where | Who can use it |
+|---|---|---|
+| n8n editor | http://100.85.160.126:5678 | Anyone on Kanishk's Tailscale network. Login: ask Akshita (never in the repo) |
+| Webhook the sim calls | `POST http://100.85.160.126:5678/webhook/sos` | Anyone on Tailscale |
+| Run the sim against real HQ | open the sim with `?hq=http://100.85.160.126:5678` (e.g. `http://localhost:8000/?hq=http://100.85.160.126:5678`) | Anyone on Tailscale |
+| Run the sim with fake HQ | open the sim without `?hq=` (mock replies, no audio, no API cost) | Anyone |
+| Check HQ is alive | `./hq/test_live.sh` (4 languages, prints triage and whether audio came back; uses API credit) | Anyone on Tailscale |
+| Deploy a workflow change | edit `hq/code/*.js` or `hq/build_workflow.mjs`, then `RG_SSH_KEY=~/.ssh/<key> ./hq/deploy.sh` | Needs SSH access to kaakserver (Kanishk adds your public key) |
+| API request/response format | [`contracts/sos_batch.example.json`](../contracts/sos_batch.example.json) | |
+| API keys | stored in n8n Credentials (`ElevenLabs API key`, `Anthropic API key`) | Only via the n8n editor |
+
+**Getting on Tailscale:** install Tailscale, then Kanishk shares the `kaakserver` machine with you (Tailscale admin →
+Machines → kaakserver → Share) or invites you to his tailnet. Test with `curl http://100.85.160.126:5678/healthz`.
+
+**Still to decide (team):** which laptop runs the live demo. n8n downloads SOS recordings from that laptop
+(`simBase` in the *Check cache* node), so it must serve `sim/` with `python3 -m http.server 8000 --bind 0.0.0.0`
+and be on Tailscale. Send Akshita its Tailscale IP. Text-only SOS notes work without this.
+
 HQ is where vans hand in SOS notes when they reach base. It is **not** part of the field: no van ever waits for it.
 `sim/hq_link.js` queues batches and retries, so you can kill n8n mid-demo and the field doesn't notice.
 

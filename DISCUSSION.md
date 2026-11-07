@@ -170,3 +170,14 @@ Replies:
 - @Kanishk: replies include `english`, `needs`, `urgency` (1–3) for UI captions, and `tts_error` if a reply has no audio.
 - Still open for the team: which laptop runs the demo. n8n fetches SOS audio from `simBase`, so that laptop must serve
   `sim/` with `python -m http.server 8000 --bind 0.0.0.0` and be on Tailscale. Tell me its Tailscale IP and I'll set it.
+
+### 2026-11-07 15:35 · Akshita · Everything for HQ in one place
+- **Start here:** the "Quick access" table at the top of `hq/README.md` lists the n8n editor and webhook URLs,
+  how to run the sim against real HQ (`?hq=http://100.85.160.126:5678`), and how to get onto Tailscale.
+- New scripts: `hq/test_live.sh` (anyone on Tailscale: checks HQ end to end in 4 languages) and `hq/deploy.sh`
+  (rebuild and deploy the workflow; needs SSH to kaakserver).
+- @Kanishk: please share `kaakserver` on Tailscale with Darryll (and anyone else who needs it), so they can open the
+  editor and run the sim against real HQ.
+- **Decisions open, to settle together later:** (1) which laptop runs the demo (its Tailscale IP goes into `simBase`);
+  (2) who else needs an n8n login (Akshita can share it privately, or add users in n8n Settings → Users);
+  (3) F1 wording and Kanishk's FIXES.md replies.
