@@ -320,7 +320,13 @@ function makeBoard(canvas, sideKey) {
     return c;
   }
 
-  return { draw, cellAt, invalidate() { sizeKey = ''; }, setHover(c) { hover = c; }, reveal() { born = 0; } };
+  // Grid cell -> page coordinates (centre of the cell on the terrain). Used by the scripted demo recording.
+  function cellToClient(world, x, y) {
+    const r = canvas.getBoundingClientRect(), [px, py] = at(world, { x, y });
+    return [r.left + (px / canvas.width) * r.width, r.top + (py / canvas.height) * r.height];
+  }
+
+  return { draw, cellAt, cellToClient, invalidate() { sizeKey = ''; }, setHover(c) { hover = c; }, reveal() { born = 0; } };
 }
 
 // ── Trend chart: served over time, both systems, same scale ─────
@@ -561,6 +567,13 @@ function backdrop() {
 const mark = $('mark');
 mark.setAttribute('aria-label', mark.textContent);
 mark.innerHTML = [...mark.textContent].map((ch, i) => `<span aria-hidden="true" style="--i:${i}">${ch === ' ' ? '&nbsp;' : ch}</span>`).join('');
+
+// Read-only hook for the scripted video (pitch/video/make_video.py): where things are on screen, and the counters.
+window.reliefGrid = {
+  base: () => ({ ...sim.world.base }),
+  toClient: (side, x, y) => boards[side === 'ours' ? 0 : 1].cellToClient(sim.world, x, y),
+  snapshot: () => { const s = sim.snapshot(); return { t: s.t, ours: s.ours.served, disp: s.dispatcher.served, doubles: s.ours.doubles }; },
+};
 
 readColors();
 backdrop();
