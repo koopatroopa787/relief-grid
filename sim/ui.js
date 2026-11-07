@@ -6,6 +6,8 @@ const { createSim } = await import(new URLSearchParams(location.search).has('moc
 const $ = (id) => document.getElementById(id);
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const SEED = 7;
+const BRUSH = 2; // jam brush radius, in cells
+const still = matchMedia('(prefers-reduced-motion: reduce)');
 const BASE_TPS = 6; // ticks per second at 1× speed
 
 // ── Split-flap numerals ─────────────────────────────────────────
@@ -45,7 +47,8 @@ const SLAB = 2.2;     // depth of the model's base, in levels
 
 function makeBoard(canvas, sideKey) {
   const ctx = canvas.getContext('2d');
-  let terrain = null, sizeKey = '', P = null, lvl = null, hatch = null;
+  let terrain = null, sizeKey = '', P = null, lvl = null, hatch = null, hover = null, born = 0;
+  const tmp = document.createElement('canvas');
 
   // Grid corner (x, y) at level z -> canvas pixels.
   const iso = (x, y, z) => [P.ox + (x - y) * P.tw / 2, P.oy + (x + y) * P.th / 2 - z * P.zs];
@@ -188,6 +191,7 @@ function makeBoard(canvas, sideKey) {
   function draw(sim, snap, now = performance.now()) {
     const { world, radio } = sim;
     resize(world);
+    if (!canvas.width || !canvas.height) return; // not laid out yet; drawImage of a 0-size canvas throws and would kill the frame loop
     const side = snap[sideKey];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(terrain, 0, 0);
@@ -269,11 +273,38 @@ function makeBoard(canvas, sideKey) {
     }
     ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
 
+    // Brush footprint under the pointer: the exact cells a click will jam (radio.jam uses a radius-2 disc).
+    if (hover) {
+      const z = zAt(world, hover.x, hover.y) + 0.05, R = BRUSH + 0.5;
+      const col = tool === 'jam' ? colors.signal : colors.ink;
+      ctx.beginPath();
+      for (let i = 0; i <= 40; i++) {
+        const t = (i / 40) * Math.PI * 2, [px, py] = iso(hover.x + 0.5 + R * Math.cos(t), hover.y + 0.5 + R * Math.sin(t), z);
+        i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      }
+      ctx.fillStyle = col; ctx.globalAlpha = 0.14; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.strokeStyle = colors['paper-3']; ctx.lineWidth = 4 * P.dpr; ctx.stroke(); // halo keeps it legible over dense blocks
+      ctx.strokeStyle = col; ctx.lineWidth = 2 * P.dpr; ctx.setLineDash([5 * P.dpr, 3 * P.dpr]); ctx.stroke(); ctx.setLineDash([]);
+    }
+
     // Van labels last, so nothing covers them.
     ctx.font = `600 ${Math.max(10 * P.dpr, P.tw * 0.75)}px ${css('--font-data')}`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = colors.ink;
     ctx.strokeStyle = colors['paper-3']; ctx.lineWidth = 3 * P.dpr; ctx.lineJoin = 'round';
     for (const v of side.vans) { const [x, y] = tops.get(v.id); ctx.strokeText(v.id, x, y - P.zs); ctx.fillText(v.id, x, y - P.zs); }
+    pixelate(now);
+  }
+
+  // On load and reset the plate resolves from coarse blocks to sharp, in steps, like a print coming up.
+  function pixelate(now) {
+    if (!born) born = now;
+    const k = Math.max(0, (now - born) / 900); // a rAF timestamp can predate `born` set from performance.now()
+    if (k >= 1 || still.matches) return;
+    const s = [36, 22, 14, 8, 4, 2][Math.floor(k * 6)] * P.dpr;
+    tmp.width = Math.ceil(canvas.width / s); tmp.height = Math.ceil(canvas.height / s);
+    tmp.getContext('2d').drawImage(canvas, 0, 0, tmp.width, tmp.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(tmp, 0, 0, canvas.width, canvas.height); ctx.imageSmoothingEnabled = true;
   }
 
   // Inverse projection: pointer -> grid cell, refined for the terrain height under it.
@@ -289,7 +320,7 @@ function makeBoard(canvas, sideKey) {
     return c;
   }
 
-  return { draw, cellAt, invalidate() { sizeKey = ''; } };
+  return { draw, cellAt, invalidate() { sizeKey = ''; }, setHover(c) { hover = c; }, reveal() { born = 0; } };
 }
 
 // ── Trend chart: served over time, both systems, same scale ─────
@@ -340,6 +371,7 @@ async function newSim() {
   $('btnBlackout').setAttribute('aria-pressed', 'false');
   $('btnBlackout').querySelector('span').textContent = 'Blackout';
   $('seedLabel').textContent = `seed ${SEED}`;
+  boards.forEach((b) => b.reveal());
   render();
 }
 
@@ -409,6 +441,8 @@ function render() {
   const ds = $('dispState');
   ds.textContent = linked ? `Tower linked · ${linked}/6` : 'Tower cut off';
   ds.className = linked ? 'state' : 'state bad';
+  const gap = snap.ours.served - snap.dispatcher.served;
+  $('gap').textContent = gap === 0 ? 'Level' : gap > 0 ? `Relief Grid +${gap}` : `Dispatcher +${-gap}`;
   $('sosCount').textContent = snap.sos.length ? `${snap.sos.filter((x) => x.state === 'replied').length}/${snap.sos.length}` : '0';
   renderSos(snap);
   drawTrend(sim.world.households.length);
@@ -445,11 +479,18 @@ boards.forEach((b, i) => {
   let down = false;
   const paint = (e) => {
     const c = b.cellAt(e, sim.world);
-    tool === 'jam' ? sim.radio.jam(c.x, c.y, 2) : sim.radio.unjam(c.x, c.y, 2);
+    tool === 'jam' ? sim.radio.jam(c.x, c.y, BRUSH) : sim.radio.unjam(c.x, c.y, BRUSH);
     render();
   };
+  const onMap = (c) => c.x >= 0 && c.y >= 0 && c.x < sim.world.w && c.y < sim.world.h;
   canvas.addEventListener('pointerdown', (e) => { down = true; canvas.setPointerCapture(e.pointerId); paint(e); });
-  canvas.addEventListener('pointermove', (e) => down && paint(e));
+  canvas.addEventListener('pointermove', (e) => {
+    if (!sim) return;
+    const c = b.cellAt(e, sim.world);
+    b.setHover(e.pointerType === 'mouse' && onMap(c) ? c : null);
+    if (down) paint(e);
+  });
+  canvas.addEventListener('pointerleave', () => b.setHover(null));
   canvas.addEventListener('pointerup', () => { down = false; });
   canvas.addEventListener('pointercancel', () => { down = false; });
 });
