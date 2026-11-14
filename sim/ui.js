@@ -565,7 +565,6 @@ $('modeLife').addEventListener('click', () => setMode('lifeline'));
 $('btnBlackout').addEventListener('click', () => {
   const on = !sim.radio.blackout;
   sim.radio.setBlackout(on);
-  if (!on) sim.radio.clearJam();
   $('btnBlackout').setAttribute('aria-pressed', String(on));
   $('btnBlackout').querySelector('span').textContent = on ? 'Restore radio' : 'Blackout';
   render();
